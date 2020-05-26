@@ -1,0 +1,202 @@
+#!/bin/sh
+
+#DEBUG=1
+if [ "$DEBUG" ]; then
+    DEBUG() { {
+        printf '%s\n' "$1"; shift
+        printf '    %s\n' "$@"
+    } >&2; }
+else
+    DEBUG() { :; }
+fi
+
+################################################################################
+
+die() {
+    printf '%s: %s\n' "${0##*/}" "$*"
+    exit 5
+}
+testname() {
+    H="${1:+$1: }"; shift
+    for V in "$@"; do
+        case "$V" in *[!A-Z0-9_]*|[0-9]*) die "${H}Bad varname '$V'"; esac
+    done
+}
+testint() {
+    H="${1:+$1: }"; shift
+    for V in "$@"; do
+        case "$V" in *[!0-9]*) die "${H}Bad integer '$V'"; esac
+    done
+}
+# Usage: getvar VARNAME1 VARNAME2
+#
+# Variable VARNAME1 is set to whatever variable VARNAME2 contains.
+getvar() { testname getvar "$1" "$2"; _getvar "$@"; }
+_getvar() { eval "$1=\"\$$2\""; }
+
+# Usage: setvar VARNAME VALUE
+#
+# Set variable VARNAME to the specified value.
+setvar() { testname setvar "$1"; _setvar "$@"; }
+_setvar() { eval "$1=\"\$2\""; }
+
+# Usage: unsetvar VARNAME
+#
+# Unset variable VARNAME.
+unsetvar() { testname unsetvar "$1"; _unsetvar "$@"; }
+_unsetvar() { eval "$1=''"; }
+
+# Usage: incvar VARNAME
+#
+# Sets variable VARNAME to 0 if unset, otherwise increment VARNAME by one.
+incvar() { testname incvar "$1"; _incvar "$@"; }
+_incvar() { eval "$1=\"\$((\${$1:--1} + 1))\""; } #VAR="$((${VAR:--1} + 1))"
+
+# Usage: VARNAME VALUE
+#
+# Set varible VARNAME to VALUE, except remove all trailing '.0' first.
+stripzeroes() {
+    #R="$STATE"
+    #while [ "$R" != "${R%.0}" ]; do R="${R%.0}"; done
+    eval "$1=\"\$2\";
+    while [ \"\$$1\" != \"\${$1%.0}\" ]; do $1=\"\${$1%.0}\"; done"
+}
+
+# Usage: increment_state STATE
+#
+# Where STATE is a number like '0' or '1.2' or '0.2.3'. Increments last digit
+# of state by one.
+increment_state() {
+    # case "$STATE" in
+    #     *.*) STATE="${STATE%.*}.$((${STATE##*.}+1))";;
+    #     *) STATE="$((STATE+1))"
+    # esac
+    testname increment_state "$1"
+    eval "case \"\$$1\" in
+        *.*) $1=\"\${$1%.*}.\$((\${$1##*.}+1))\";;
+        *) $1=\"\$(($1+1))\"
+    esac"
+}
+
+# # Usage: increment VARNAME
+# #
+# # Sets VARNAME to 0 if unset, otherwise increment by one.
+# increment() {
+#     testname increment "$1"
+#     #VAR="$((${VAR:--1} + 1))"
+#     eval "$1=\"\$((\${$1:--1} + 1))\""
+# }
+# incvar() {
+#     testname increment "$1"
+#     #VAR="$((${VAR:--1} + 1))"
+#     eval "$1=\"\$((\${$1:--1} + 1))\""
+# }
+
+# Usage: LEVELVAR STATEVAR
+#
+# Goes one level deeper into hierarchy, by adding one to LEVELVAR and appending
+# a '.SUBSTATE' number to STATEVAR. SUBSTATE is guaranteed to be unique for
+# each LEVEL. (Uses forever incrementing variables ${LAST$LVL} to keep track of
+# which substates to use.)
+add_substate() {
+    testname add_substate "$1" "$2"
+    local _LVL
+    _incvar "$1"                      # increment level
+    _getvar _LVL "$1"                 #   get level value
+    testint add_substate "$_LVL"
+    _incvar "LAST$_LVL"               # increment last substate
+    # STATE="$STATE.${LAST$_LVL}"
+    eval "$2=\"\$$2.\$LAST$_LVL\""    # append last substate to state
+}
+
+remove_substate() {
+    testname remove_level "$2"
+    # LVL="$((LVL-1))"
+    #eval "$1=\"\$(($1-1))\""  # decrement LVL
+    setvar "$1" "$(($1-1))"    # decrement LVL
+    # STATE="${STATE%.*}"
+    eval "$2=\"\${$2%.*}\""    # remove number from STATE
+}
+
+# Usage: remove_level STATE LVL
+remove_level() {
+    # LVL="$((LVL-1))"
+    #eval "$1=\"\$(($1-1))\""  # decrement LVL
+    setvar "$1" "$(($1-1))"    # decrement LVL
+    # STATE="${STATE%.*}"
+    testname remove_level "$2"
+    eval "$2=\"\${$2%.*}\""    # remove number from STATE
+}
+
+output_rule() {
+    local _RULE _STATE
+    testname output_rule "$@"
+    getvar _RULE "$1"
+    getvar _STATE "$2"
+    [ "$_RULE" ] && printf "%s -> %s\n" "$_RULE" "$STATE"
+    _unsetvar "$1"
+}
+
+parsy() {
+    printf '%s\n' "$*"
+    local LVL=0 RULE='' STATE=0
+    for A in "$@"; do
+        DEBUG="$A"
+        case "$A" in
+            '('|'[')                           # start parenthesis or bracket
+                output_rule RULE STATE
+                add_substate LVL STATE         #   add substate
+                setvar "BEG$LVL" "$STATE"      #     remember opening state
+            ;;
+            ')')                               # end parenthesis
+                # FIXME: STATE should end in '.x'
+                output_rule RULE STATE
+                unsetvar "BEG$LVL"             #   forget opening state
+                remove_level LVL STATE
+                increment_state STATE
+            ;;
+            ']')                               # end bracket
+                # FIXME: STATE should end in '.x'
+                output_rule RULE STATE
+                unsetvar "BEG$LVL"             #   forget opening state
+                remove_level LVL STATE
+            ;;
+            '|')                               #   pipe
+                # FIXME: STATE should end in '.x'
+                output_rule RULE STATE
+                getvar STATE "BEG$LVL"         #     return state to start bracket
+            ;;
+            *)                                 #   anything else
+                output_rule RULE STATE
+
+                stripzeroes REDUCED "$STATE"
+                echo "REDUCED:$STATE -> $REDUCED"
+                REDUCED="$STATE"
+                while [ "$REDUCED" != "${REDUCED%.0}" ]; do
+                    REDUCED="${REDUCED%.0}"
+                done
+
+                RULE="$REDUCED:$A"
+                increment_state STATE
+                #setvar "USED$LVL" "${STATE##*.}"
+                # increase USED
+            ;;
+        esac
+        local USED BEG
+        getvar USED "USED$LVL"
+        getvar BEG  "BEG$LVL"
+
+        DEBUG "$DEBUG" "STATE: $STATE" "LVL: $LVL" "BEG$LVL: $BEG" "USED$LVL: $USED"
+    done
+    if [ "$LVL" -gt 0 ]; then
+        die "Too few ending parentheses!!"
+    fi
+}
+
+################################################################################
+
+#parsy thingy '(' ')' '(' ')' '(' ')' '(' ')'
+
+parsy thingy '[' tool '|' lamp ']' '(' on '|' off ')' '(' green '|' blue ')'
+
+#[eof]
