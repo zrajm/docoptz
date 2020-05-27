@@ -40,12 +40,6 @@ _getvar() { eval "$1=\"\$$2\""; }
 setvar() { testname setvar "$1"; _setvar "$@"; }
 _setvar() { eval "$1=\"\$2\""; }
 
-# Usage: unsetvar VARNAME
-#
-# Unset variable VARNAME.
-unsetvar() { testname unsetvar "$1"; _unsetvar "$@"; }
-_unsetvar() { eval "$1=''"; }
-
 # Usage: incvar VARNAME
 #
 # Sets variable VARNAME to 0 if unset, otherwise increment VARNAME by one.
@@ -78,20 +72,6 @@ increment_state() {
     esac"
 }
 
-# # Usage: increment VARNAME
-# #
-# # Sets VARNAME to 0 if unset, otherwise increment by one.
-# increment() {
-#     testname increment "$1"
-#     #VAR="$((${VAR:--1} + 1))"
-#     eval "$1=\"\$((\${$1:--1} + 1))\""
-# }
-# incvar() {
-#     testname increment "$1"
-#     #VAR="$((${VAR:--1} + 1))"
-#     eval "$1=\"\$((\${$1:--1} + 1))\""
-# }
-
 # Usage: LEVELVAR STATEVAR
 #
 # Goes one level deeper into hierarchy, by adding one to LEVELVAR and appending
@@ -110,7 +90,7 @@ add_substate() {
 }
 
 remove_substate() {
-    testname remove_level "$2"
+    testname remove_substate "$2"
     # LVL="$((LVL-1))"
     #eval "$1=\"\$(($1-1))\""  # decrement LVL
     setvar "$1" "$(($1-1))"    # decrement LVL
@@ -129,12 +109,10 @@ remove_level() {
 }
 
 output_rule() {
-    local _RULE _STATE
-    testname output_rule "$@"
+    local STATE="$2" _RULE
     getvar _RULE "$1"
-    getvar _STATE "$2"
     [ "$_RULE" ] && printf "%s -> %s\n" "$_RULE" "$STATE"
-    _unsetvar "$1"
+    unset "$1"
 }
 
 parsy() {
@@ -144,33 +122,33 @@ parsy() {
         DEBUG="$A"
         case "$A" in
             '('|'[')                           # start parenthesis or bracket
-                output_rule RULE STATE
+                output_rule RULE "$STATE"
                 add_substate LVL STATE         #   add substate
                 setvar "BEG$LVL" "$STATE"      #     remember opening state
             ;;
             ')')                               # end parenthesis
                 # FIXME: STATE should end in '.x'
-                output_rule RULE STATE
-                unsetvar "BEG$LVL"             #   forget opening state
+                output_rule RULE "${STATE%.*}.x"
+                unset "BEG$LVL"                #   forget opening state
                 remove_level LVL STATE
                 increment_state STATE
             ;;
             ']')                               # end bracket
                 # FIXME: STATE should end in '.x'
-                output_rule RULE STATE
-                unsetvar "BEG$LVL"             #   forget opening state
+                output_rule RULE "${STATE%.*}.x"
+                unset "BEG$LVL"                #   forget opening state
                 remove_level LVL STATE
             ;;
             '|')                               #   pipe
                 # FIXME: STATE should end in '.x'
-                output_rule RULE STATE
+                output_rule RULE "${STATE%.*}.x"
                 getvar STATE "BEG$LVL"         #     return state to start bracket
             ;;
             *)                                 #   anything else
-                output_rule RULE STATE
+                output_rule RULE "$STATE"
 
                 stripzeroes REDUCED "$STATE"
-                echo "REDUCED:$STATE -> $REDUCED"
+                #echo "REDUCED:$STATE -> $REDUCED"
                 REDUCED="$STATE"
                 while [ "$REDUCED" != "${REDUCED%.0}" ]; do
                     REDUCED="${REDUCED%.0}"
@@ -195,8 +173,57 @@ parsy() {
 
 ################################################################################
 
+:<<'BLOCK_COMMENT'
+
 #parsy thingy '(' ')' '(' ')' '(' ')' '(' ')'
 
 parsy thingy '[' tool '|' lamp ']' '(' on '|' off ')' '(' green '|' blue ')'
+
+echo --------------------------------------------------------------------------------
+X="( lamp | machine ) ( on | off | dim VALUE )"
+
+cat <<EOF
+EXPECTED
+$X
+0:lamp -> 1
+0:machine -> 1
+1:on -> 2
+1:off -> 2
+1:dim -> 1.1
+1.1:* -> 2
+EOF
+
+parsy $X
+
+echo --------------------------------------------------------------------------------
+X="0 ( 0.0 a 0.1 (0.1.0 b 0.1.1 (0.1.1.0 c 0.1.1.1 )  ) ) 1"
+X="( a ( b ( c ) ) )"
+cat <<EOF
+EXPECTED
+$X
+0:a -> 0.1
+0.1:b -> 0.1.0
+1.1:c -> 1
+EOF
+
+parsy $X
+
+BLOCK_COMMENT
+
+echo --------------------------------------------------------------------------------
+LINE='my_program go ( --up | --down | --left | --right )'
+
+cat <<EXPECTED
+$LINE
+0:go -> 1
+1:--up -> 2
+1:--down -> 2
+1:--left -> 2
+1:--right -> 2
+DONE=2
+--------------------
+EXPECTED
+LINE="${LINE#* }"
+parsy $LINE
 
 #[eof]
