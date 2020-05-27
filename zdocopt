@@ -16,13 +16,13 @@ die() {
     printf '%s: %s\n' "${0##*/}" "$*"
     exit 5
 }
-testname() {
+varname_or_die() {
     H="${1:+$1: }"; shift
     for V in "$@"; do
         case "$V" in *[!A-Z0-9_]*|[0-9]*) die "${H}Bad varname '$V'"; esac
     done
 }
-testint() {
+int_or_die() {
     H="${1:+$1: }"; shift
     for V in "$@"; do
         case "$V" in *[!0-9]*) die "${H}Bad integer '$V'"; esac
@@ -31,20 +31,36 @@ testint() {
 # Usage: getvar VARNAME1 VARNAME2
 #
 # Variable VARNAME1 is set to whatever variable VARNAME2 contains.
-getvar() { testname getvar "$1" "$2"; _getvar "$@"; }
+getvar() { varname_or_die getvar "$1" "$2"; _getvar "$@"; }
 _getvar() { eval "$1=\"\$$2\""; }
+
+# Usage: getvar VARNAME1 VARNAME2
+#
+# Variable VARNAME1 is set to whatever variable VARNAME2 contains.
+getint() { varname_or_die getint "$1" "$2"; _getint "$@"; }
+_getint() {
+    eval "$1=\"\$$2\"";
+    int_or_die getint "$1";
+}
+
 
 # Usage: setvar VARNAME VALUE
 #
 # Set variable VARNAME to the specified value.
-setvar() { testname setvar "$1"; _setvar "$@"; }
+setvar() { varname_or_die setvar "$1"; _setvar "$@"; }
 _setvar() { eval "$1=\"\$2\""; }
 
 # Usage: incvar VARNAME
 #
 # Sets variable VARNAME to 0 if unset, otherwise increment VARNAME by one.
-incvar() { testname incvar "$1"; _incvar "$@"; }
+incvar() { varname_or_die incvar "$1"; _incvar "$@"; }
 _incvar() { eval "$1=\"\$((\${$1:--1} + 1))\""; } #VAR="$((${VAR:--1} + 1))"
+
+# Usage: decvar VARNAME
+#
+# Sets variable VARNAME to 0 if unset, otherwise decrement VARNAME by one.
+decvar() { varname_or_die decvar "$1"; _decvar "$@"; }
+_decvar() { _setvar "$1" "$(($1 - 1))"; }
 
 # Usage: VARNAME VALUE
 #
@@ -65,7 +81,7 @@ increment_state() {
     #     *.*) STATE="${STATE%.*}.$((${STATE##*.}+1))";;
     #     *) STATE="$((STATE+1))"
     # esac
-    testname increment_state "$1"
+    varname_or_die increment_state "$1"
     eval "case \"\$$1\" in
         *.*) $1=\"\${$1%.*}.\$((\${$1##*.}+1))\";;
         *) $1=\"\$(($1+1))\"
@@ -79,24 +95,24 @@ increment_state() {
 # each LEVEL. (Uses forever incrementing variables ${LAST$LVL} to keep track of
 # which substates to use.)
 add_substate() {
-    testname add_substate "$1" "$2"
+    varname_or_die add_substate "$1" "$2"
     local _LVL
     _incvar "$1"                      # increment level
     _getvar _LVL "$1"                 #   get level value
-    testint add_substate "$_LVL"
+    int_or_die add_substate "$_LVL"
     _incvar "LAST$_LVL"               # increment last substate
     # STATE="$STATE.${LAST$_LVL}"
     eval "$2=\"\$$2.\$LAST$_LVL\""    # append last substate to state
 }
 
-remove_substate() {
-    testname remove_substate "$2"
-    # LVL="$((LVL-1))"
-    #eval "$1=\"\$(($1-1))\""  # decrement LVL
-    setvar "$1" "$(($1-1))"    # decrement LVL
-    # STATE="${STATE%.*}"
-    eval "$2=\"\${$2%.*}\""    # remove number from STATE
-}
+# remove_substate() {
+#     varname_or_die remove_substate "$2"
+#     # LVL="$((LVL-1))"
+#     #eval "$1=\"\$(($1-1))\""  # decrement LVL
+#     setvar "$1" "$(($1-1))"    # decrement LVL
+#     # STATE="${STATE%.*}"
+#     eval "$2=\"\${$2%.*}\""    # remove number from STATE
+# }
 
 # Usage: remove_level STATE LVL
 remove_level() {
@@ -104,7 +120,7 @@ remove_level() {
     #eval "$1=\"\$(($1-1))\""  # decrement LVL
     setvar "$1" "$(($1-1))"    # decrement LVL
     # STATE="${STATE%.*}"
-    testname remove_level "$2"
+    varname_or_die remove_level "$2"
     eval "$2=\"\${$2%.*}\""    # remove number from STATE
 }
 
@@ -115,7 +131,107 @@ output_rule() {
     unset "$1"
 }
 
-parsy() {
+# Usage: push_state LVL STATEVAR
+#
+# Increment LVL by one, and add another substate onto STATEVAR. STATEVAR has
+# the syntax STATE[_SUBSTATE[_SUBSUBSTATE]], with '_' as separator between
+# states. STATE is guaranteed to be unique.
+
+#### Goes one level deeper into hierarchy, by adding one to LEVELVAR and appending
+#### a '.SUBSTATE' number to STATEVAR. SUBSTATE is guaranteed to be unique for
+#### each LEVEL. (Uses forever incrementing variables ${LAST$LVL} to keep track of
+#### which substates to use.)
+push_state() {
+    varname_or_die push_state "$1" "$2"                                    ## from add_substate
+    local _LVL                                                             ## from add_substate
+    _incvar "$1"                      # increment level                    ## from add_substate
+    _getvar _LVL "$1"                 #   get level value                  ## from add_substate
+    int_or_die push_state "$_LVL"                                          ## from add_substate
+    _incvar "LAST$_LVL"               # increment last substate            ## from add_substate
+    # STATE="$STATE.${LAST$_LVL}"                                          ## from add_substate
+    eval "$2=\"\$$2.\$LAST$_LVL\""    # append last substate to state      ## from add_substate
+
+    # varname_or_die push_state "$@"
+    # local _LVL
+    # _incvar "$1"                      # increment level
+    # _getvar _LVL "$1"                 #   get level value
+    # _incvar "LAST$_LVL"               # increment last substate
+    # # STATE="$STATE.${LAST$_LVL}"
+    # eval "$2=\"\$${2}_\$LAST$_LVL\""    # append last substate to state
+}
+# Usage: pop_state LVL STATEVAR
+pop_state() {
+    varname_or_die pop_state "$@"
+    _decvar "$1"                # decrement LVL
+    eval "$2=\"\${$2%.*}\""     # remove number from STATE
+}
+# Usage: inc_state STATEVAR
+inc_state() {
+    varname_or_die inc_state "$1"
+    # case "$STATE" in
+    #     *.*) STATE="${STATE%.*}.$((${STATE##*.}+1))";;
+    #     *) STATE="$((STATE+1))"
+    # esac
+    eval "case \"\$$1\" in
+        *.*) $1=\"\${$1%.*}.\$((\${$1##*.}+1))\";;
+        *) $1=\"\$(($1+1))\"
+    esac"
+}
+
+# Usage: preparse TOKENIZED
+#
+# Go through TOKENIZED and populate environment with variables needed for
+# 'parse' to know the end state of each parethetic group. (FIXME: Also check
+# nesting for correctness?)
+preparse() {
+    local LVL=0 RULE='' STATE=0 INDENT=''
+    local OUT=''
+    for A in "$@"; do
+        DEBUG="$A"
+        OUT="${OUT:+$OUT }$STATE $A"
+        case "$A" in
+            '('|'[')                           # start parenthesis or bracket
+                push_state LVL STATE
+                #add_substate LVL STATE         #   add substate
+                setvar "BEG$LVL" "$STATE"      #     remember opening state
+
+                NEXTINDENT="    $INDENT"
+                #add_substate LVL2 STATE         #   add substate
+                #setvar "BEG$LVL" "$STATE"       #     remember opening state
+                ;;
+            ']'|')')                           # end bracket
+                # pop_state LVL STATE
+                unset "BEG$LVL"                #   forget opening state
+                pop_state LVL STATE
+                #remove_level LVL STATE
+                increment_state STATE
+
+                INDENT="${INDENT#    }"
+                NEXTINDENT="$INDENT"
+                #unset "BEG$LVL"                #   forget opening state
+                #remove_level LVL2 STATE
+                ;;
+            '|')                               #   pipe
+                getvar STATE "BEG$LVL"         #     return state to start bracket
+                NEXTINDENT="$INDENT"
+                INDENT="${INDENT#  }"
+                ;;
+            *)                                 #   anything else
+                increment_state STATE
+            ;;
+        esac
+        out "$INDENT>>$A"
+        echo "  ${INDENT}LVL:$LVL STATE:$STATE"
+        INDENT="$NEXTINDENT"
+    done
+    printf '%s\n' "OUT: $OUT $STATE"
+    # if [ "$LVL" -gt 0 ]; then
+    #     die "Too few ending parentheses!!"
+    # fi
+}
+
+
+parse() {
     printf '%s\n' "$*"
     local LVL=0 RULE='' STATE=0
     for A in "$@"; do
@@ -173,11 +289,48 @@ parsy() {
 
 ################################################################################
 
+# What 'echo' SHOULD do.
+out() {
+    printf '%s\n' "$*"
+}
+
+# PREPARSE, note of ending for each paren. connect the BEG$LVL or similr of
+# each paren to a definite end to use.
+
+X='  fire   ( bullet | torpedo ( traditional | smart ) )   ( target NAME | randomly )'
+out $X        # intentionally unquoted
+preparse $X   # intentionally unquoted
+
+exit
+
+__END__
+################################################################################
+################################################################################
+################################################################################
+################################################################################
+################################################################################
+
+
+#           1.0      1.1      1.2           1.2.1
+X='0 fire 1 ( bullet | torpedo ( traditional | smart ) ) 2 ( target NAME | randomly ) 3'
+X='  fire   ( bullet | torpedo ( traditional | smart ) )   ( target NAME | randomly ) 3'
+
+cat <<EXPECTED
+$X
+0:fire -> 1
+1:bullet -> 2
+1:torpedo -> 1.1
+1.1:traditional -> 1.
+
+EXPECTED
+
+
+exit
 :<<'BLOCK_COMMENT'
 
-#parsy thingy '(' ')' '(' ')' '(' ')' '(' ')'
+#parse thingy '(' ')' '(' ')' '(' ')' '(' ')'
 
-parsy thingy '[' tool '|' lamp ']' '(' on '|' off ')' '(' green '|' blue ')'
+parse thingy '[' tool '|' lamp ']' '(' on '|' off ')' '(' green '|' blue ')'
 
 echo --------------------------------------------------------------------------------
 X="( lamp | machine ) ( on | off | dim VALUE )"
@@ -193,7 +346,7 @@ $X
 1.1:* -> 2
 EOF
 
-parsy $X
+parse $X
 
 echo --------------------------------------------------------------------------------
 X="0 ( 0.0 a 0.1 (0.1.0 b 0.1.1 (0.1.1.0 c 0.1.1.1 )  ) ) 1"
@@ -206,7 +359,7 @@ $X
 1.1:c -> 1
 EOF
 
-parsy $X
+parse $X
 
 BLOCK_COMMENT
 
@@ -224,6 +377,6 @@ DONE=2
 --------------------
 EXPECTED
 LINE="${LINE#* }"
-parsy $LINE
+parse $LINE
 
 #[eof]
