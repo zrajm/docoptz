@@ -12,6 +12,7 @@ fi
 
 ################################################################################
 
+out() { printf '%s\n' "$*"; }
 die() {
     printf '%s: %s\n' "${0##*/}" "$*"
     exit 5
@@ -43,6 +44,15 @@ _getint() {
     int_or_die getint "$1";
 }
 
+# Usage: append VARNAME STRING
+#
+# Append STRING to VARNAME with a space inbetween (unless VARNAME is empty, in
+# which case no space is inserted in front of STRING).
+append() {
+    varname_or_die append "$1";
+    # VARNAME="${VARNAME:+$VARNAME }$2"
+    eval "$1=\"\${$1:+\$$1 }\$2\""
+}
 
 # Usage: setvar VARNAME VALUE
 #
@@ -136,7 +146,7 @@ output_rule() {
 # Increment LVL by one, and add another substate onto STATEVAR. STATEVAR has
 # the syntax STATE[_SUBSTATE[_SUBSUBSTATE]], with '_' as separator between
 # states. STATE is guaranteed to be unique.
-
+#
 #### Goes one level deeper into hierarchy, by adding one to LEVELVAR and appending
 #### a '.SUBSTATE' number to STATEVAR. SUBSTATE is guaranteed to be unique for
 #### each LEVEL. (Uses forever incrementing variables ${LAST$LVL} to keep track of
@@ -149,8 +159,9 @@ push_state() {
     int_or_die push_state "$_LVL"                                          ## from add_substate
     _incvar "LAST$_LVL"               # increment last substate            ## from add_substate
     # STATE="$STATE.${LAST$_LVL}"                                          ## from add_substate
-    eval "$2=\"\$$2.\$LAST$_LVL\""    # append last substate to state      ## from add_substate
-
+    #eval "$2=\"\$$2.\$LAST$_LVL\""    # append last substate to state      ## from add_substate
+    # STATE="${STATE}_${LAST$_LVL}"
+    eval "$2=\"\${$2}_\${LAST$_LVL}\""  # append last substate to state
     # varname_or_die push_state "$@"
     # local _LVL
     # _incvar "$1"                      # increment level
@@ -163,7 +174,7 @@ push_state() {
 pop_state() {
     varname_or_die pop_state "$@"
     _decvar "$1"                # decrement LVL
-    eval "$2=\"\${$2%.*}\""     # remove number from STATE
+    eval "$2=\"\${$2%_*}\""     # remove number from STATE
 }
 # Usage: inc_state STATEVAR
 inc_state() {
@@ -173,9 +184,31 @@ inc_state() {
     #     *) STATE="$((STATE+1))"
     # esac
     eval "case \"\$$1\" in
-        *.*) $1=\"\${$1%.*}.\$((\${$1##*.}+1))\";;
+        *_*) $1=\"\${$1%_*}_\$((\${$1##*_}+1))\";;
         *) $1=\"\$(($1+1))\"
     esac"
+}
+# Usage: trim_right SUFFIX VARNAME
+#
+# Trims all trailing occurrences of SUFFIX off the string in the variable
+# VARNAME. If there are multiple occurrences of SUFFIX they are all trimmed
+# off. (This applies ${$VARNAME%$SUFFIX} until nothing more is trimmed off.)
+trim_right() { varname_or_die trim_right "$2"; _trim_right "$@"; }
+_trim_right() {
+    local _
+    # until _="$STR";STR="${STR%$SUFFIX}";[ "$STR" = "$_" ];do :;done
+    eval "until _=\"\$$2\";$2=\"\${$2%\$1}\";[ \"\$$2\" = \"\$_\" ];do :;done"
+}
+
+handle_endpoint() {
+    getvar ENDS "$1"
+    [ "$ENDS" ] || return
+    out --------------------------------------------------------------------------------
+    for GRP in $ENDS; do                       # intentionally unquoted
+        setvar "END$GRP" "$STATE"
+        echo "TMP_GROUP: $GRP";
+    done
+    unset "$1"
 }
 
 # Usage: preparse TOKENIZED
@@ -184,47 +217,105 @@ inc_state() {
 # 'parse' to know the end state of each parethetic group. (FIXME: Also check
 # nesting for correctness?)
 preparse() {
-    local LVL=0 RULE='' STATE=0 INDENT=''
-    local OUT=''
+    local LVL=0 GROUPS=0 GROUP0=0 IN=0 RULE='' STATE=0
+    local DEBUG_INDENT='' DEBUG_INDENT_NEXT='' DEBUG_STATE='' DEBUG_GROUP=''
+    local OUT='' TRIMMED END='' UNTERMINATED_GROUPS='' GRP
+    # LVL is the current level of nesting. GROUPS in the number of the current
+    # parenthesis. In '()()' GROUPS is 1 and 2, and LVL 0 and 1. In '(())' GROUPS
+    # is also 1 & 2, but LVL is 0 (outside paren), 1 (inside first paren), and
+    # 2 (inside innermost paren). I.e. GROUPS never decreases, while LVL does.
+    # IN is the current group we're in, so in '()()' it looks like this
+    # '0(1)0(2)0', while in '(())' its '0(1(2)1)0'.
+
+    # GROUP0...N is a pseudo-array containing group stack. It has no meaning
+    # outside this loop. It contains the group number of the current
+    # parenthetical group at the end.
+    local GROUP0=0 # group at LVL zero is group number zero
     for A in "$@"; do
-        DEBUG="$A"
-        OUT="${OUT:+$OUT }$STATE $A"
+        TRIMMED="$STATE"; trim_right '_0' TRIMMED
+        append DEBUG_STATE "$TRIMMED $A"
+        append DEBUG_GROUP "$IN $A"
+        case "$A" in
+            ']'|')') :;;
+            *) handle_endpoint UNTERMINATED_GROUPS ;;
+        esac
         case "$A" in
             '('|'[')                           # start parenthesis or bracket
                 push_state LVL STATE
-                #add_substate LVL STATE         #   add substate
-                setvar "BEG$LVL" "$STATE"      #     remember opening state
+                GROUPS="$((GROUPS + 1))"
+                IN="$GROUPS"
 
-                NEXTINDENT="    $INDENT"
-                #add_substate LVL2 STATE         #   add substate
-                #setvar "BEG$LVL" "$STATE"       #     remember opening state
+                local "GROUP$LVL" "TYPE$LVL"
+                setvar "GROUP$LVL" "$GROUPS"   # loop stack of group numbers
+                case "$A" in                   # loop stack of bracket types
+                    '(') setvar "TYPE$LVL" ')' ;;
+                    '[') setvar "TYPE$LVL" ']' ;;
+                esac
+
+                local "BEG$IN"
+                setvar "BEG$IN" "$STATE"      #     remember opening state
+
+                DEBUG_INDENT_NEXT="    $DEBUG_INDENT"
                 ;;
             ']'|')')                           # end bracket
-                # pop_state LVL STATE
-                unset "BEG$LVL"                #   forget opening state
-                pop_state LVL STATE
-                #remove_level LVL STATE
-                increment_state STATE
+                local TYPE; getvar TYPE "TYPE$LVL"
+                [ "$A" != "$TYPE" ] && die "Unexpected '$A' in rule (group $IN): $*"
 
-                INDENT="${INDENT#    }"
-                NEXTINDENT="$INDENT"
-                #unset "BEG$LVL"                #   forget opening state
-                #remove_level LVL2 STATE
+                append UNTERMINATED_GROUPS "$IN"
+
+                unset "GROUP$LVL" "TYPE$LVL"   #   remove from group stack
+                pop_state LVL STATE            #   decrement LVL, remove last substate
+                inc_state STATE
+                getvar IN "GROUP$LVL"          #   get previous group from stack
+
+                DEBUG_INDENT="${DEBUG_INDENT#    }"
+                DEBUG_INDENT_NEXT="$DEBUG_INDENT"
                 ;;
             '|')                               #   pipe
-                getvar STATE "BEG$LVL"         #     return state to start bracket
-                NEXTINDENT="$INDENT"
-                INDENT="${INDENT#  }"
+                getvar STATE "BEG$IN"          #     return state to start bracket
+                DEBUG_INDENT_NEXT="$DEBUG_INDENT"
+                DEBUG_INDENT="${DEBUG_INDENT#  }"
                 ;;
             *)                                 #   anything else
-                increment_state STATE
-            ;;
+                inc_state STATE
+                ;;
         esac
-        out "$INDENT>>$A"
-        echo "  ${INDENT}LVL:$LVL STATE:$STATE"
-        INDENT="$NEXTINDENT"
+        #out "$DEBUG_INDENT>>$A"
+        #out "  ${DEBUG_INDENT}LVL:$LVL STATE:$STATE"
+        DEBUG_INDENT="$DEBUG_INDENT_NEXT"
     done
-    printf '%s\n' "OUT: $OUT $STATE"
+    unset "GROUP0"  # last element of group stack
+    handle_endpoint UNTERMINATED_GROUPS
+
+    # Loop through BEG0...N, and END0...N and output together
+    local NUM=1 TMP TMP2
+    echo ------------------------------------------------------------
+    while getvar TMP "BEG$NUM"; [ "$TMP" ]; do
+        getvar TMP2 "END$NUM"
+        trim_right '_0' TMP
+        trim_right '_0' TMP2
+        echo "Group $NUM: $TMP -> $TMP2"
+        NUM="$((NUM+1))"
+    done
+    echo ------------------------------------------------------------
+
+    if [ "$LVL" -ne 0 ]; then
+        local PAREN; getvar PAREN "TYPE$LVL"
+        die "Missing '$PAREN' at end of rule: $*"
+    fi
+    echo "IN GROUP: $IN"
+    local I=0
+    # until [ "$I" = "$GROUPS" ]; do
+    #     unset "GROUP$I"
+    # done
+
+    out "GROUPS FOUND: $GROUPS"
+
+
+    #out "OUT: $DEBUG_GROUP $IN"
+    out "OUT: $DEBUG_STATE $STATE"
+
+
     # if [ "$LVL" -gt 0 ]; then
     #     die "Too few ending parentheses!!"
     # fi
@@ -232,7 +323,7 @@ preparse() {
 
 
 parse() {
-    printf '%s\n' "$*"
+    out "$*"
     local LVL=0 RULE='' STATE=0
     for A in "$@"; do
         DEBUG="$A"
@@ -289,17 +380,15 @@ parse() {
 
 ################################################################################
 
-# What 'echo' SHOULD do.
-out() {
-    printf '%s\n' "$*"
-}
-
 # PREPARSE, note of ending for each paren. connect the BEG$LVL or similr of
 # each paren to a definite end to use.
 
-X='  fire   ( bullet | torpedo ( traditional | smart ) )   ( target NAME | randomly )'
+#X='  fire   ( bullet | torpedo ( traditional | smart ) | hej )   ( target NAME | randomly )'
+X='  ( ( fire ( bullet | torpedo ) ) | ( quench ) ( quack ) )'
 out $X        # intentionally unquoted
 preparse $X   # intentionally unquoted
+
+echo ">$BEG2<"
 
 exit
 
