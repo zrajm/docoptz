@@ -200,11 +200,18 @@ _trim_right() {
     eval "until _=\"\$$2\";$2=\"\${$2%\$1}\";[ \"\$$2\" = \"\$_\" ];do :;done"
 }
 
+# Usage: handle_endpoint GROUPSVAR STATE
+#
+# Register STATE as endpoint for each bracket group specified in the variable
+# GROUPSVAR (GROUPSVAR should contains a space separated list of bracket group
+# numbers). GROUPS is unset after processing, and variables 'BEG#' (where # is
+# each of the group numbers found in GROUPS) will be set to STATE.
 handle_endpoint() {
-    getvar ENDS "$1"
-    [ "$ENDS" ] || return
+    local GROUPS
+    getvar GROUPS "$1"
+    [ "$GROUPS" ] || return
     out --------------------------------------------------------------------------------
-    for GRP in $ENDS; do                       # intentionally unquoted
+    for GRP in $GROUPS; do                       # intentionally unquoted
         setvar "END$GRP" "$STATE"
         echo "TMP_GROUP: $GRP";
     done
@@ -218,8 +225,8 @@ handle_endpoint() {
 # nesting for correctness?)
 preparse() {
     local LVL=0 GROUPS=0 GROUP0=0 IN=0 RULE='' STATE=0
-    local DEBUG_INDENT='' DEBUG_INDENT_NEXT='' DEBUG_STATE='' DEBUG_GROUP=''
-    local OUT='' TRIMMED END='' UNTERMINATED_GROUPS='' GRP
+    local OUT='' TRIMMED END='' UNTERMINATED_GROUPS='' GRP MAX_STATE=0 PREV=''
+    local DEBUG_STATE='' DEBUG_GROUP=''
     # LVL is the current level of nesting. GROUPS in the number of the current
     # parenthesis. In '()()' GROUPS is 1 and 2, and LVL 0 and 1. In '(())' GROUPS
     # is also 1 & 2, but LVL is 0 (outside paren), 1 (inside first paren), and
@@ -237,11 +244,14 @@ preparse() {
         append DEBUG_GROUP "$IN $A"
         case "$A" in
             ']'|')') :;;
-            *) handle_endpoint UNTERMINATED_GROUPS ;;
+            *) handle_endpoint UNTERMINATED_GROUPS "$STATE";;
         esac
         case "$A" in
             '('|'[')                           # start parenthesis or bracket
-                push_state LVL STATE
+                #---------------------------------------------------------------
+                incvar LVL
+                #push_state LVL STATE
+                #---------------------------------------------------------------
                 GROUPS="$((GROUPS + 1))"
                 IN="$GROUPS"
 
@@ -254,8 +264,6 @@ preparse() {
 
                 local "BEG$IN"
                 setvar "BEG$IN" "$STATE"      #     remember opening state
-
-                DEBUG_INDENT_NEXT="    $DEBUG_INDENT"
                 ;;
             ']'|')')                           # end bracket
                 local TYPE; getvar TYPE "TYPE$LVL"
@@ -264,28 +272,42 @@ preparse() {
                 append UNTERMINATED_GROUPS "$IN"
 
                 unset "GROUP$LVL" "TYPE$LVL"   #   remove from group stack
-                pop_state LVL STATE            #   decrement LVL, remove last substate
-                inc_state STATE
-                getvar IN "GROUP$LVL"          #   get previous group from stack
-
-                DEBUG_INDENT="${DEBUG_INDENT#    }"
-                DEBUG_INDENT_NEXT="$DEBUG_INDENT"
+                #---------------------------------------------------------------
+                decvar LVL
+                #pop_state LVL STATE            #   decrement LVL, remove last substate
+                #inc_state STATE
+                #---------------------------------------------------------------
+                getvar IN "GROUP$LVL"          #   prev group number from stack
                 ;;
             '|')                               #   pipe
                 getvar STATE "BEG$IN"          #     return state to start bracket
-                DEBUG_INDENT_NEXT="$DEBUG_INDENT"
-                DEBUG_INDENT="${DEBUG_INDENT#  }"
                 ;;
             *)                                 #   anything else
-                inc_state STATE
+                #---------------------------------------------------------------
+                incvar MAX_STATE
+                STATE="$MAX_STATE"
+                #---------------------------------------------------------------
                 ;;
         esac
-        #out "$DEBUG_INDENT>>$A"
-        #out "  ${DEBUG_INDENT}LVL:$LVL STATE:$STATE"
-        DEBUG_INDENT="$DEBUG_INDENT_NEXT"
+        PREV="$A"
+        # # DEBUG: Indented parse output
+        # local DEBUG_INDENT DEBUG_INDENT_NEXT
+        # case "$A" in
+        #     '('|'[')                           # start parenthesis or bracket
+        #         DEBUG_INDENT_NEXT="    $DEBUG_INDENT" ;;
+        #     ']'|')')                           # end bracket
+        #         DEBUG_INDENT="${DEBUG_INDENT#    }"
+        #         DEBUG_INDENT_NEXT="$DEBUG_INDENT" ;;
+        #     '|')                               #   pipe
+        #         DEBUG_INDENT_NEXT="$DEBUG_INDENT"
+        #         DEBUG_INDENT="${DEBUG_INDENT#  }" ;;
+        # esac
+        # out "$DEBUG_INDENT>>$A"
+        # out "  ${DEBUG_INDENT}LVL:$LVL STATE:$STATE"
+        # DEBUG_INDENT="$DEBUG_INDENT_NEXT"
     done
     unset "GROUP0"  # last element of group stack
-    handle_endpoint UNTERMINATED_GROUPS
+    handle_endpoint UNTERMINATED_GROUPS "$STATE"
 
     # Loop through BEG0...N, and END0...N and output together
     local NUM=1 TMP TMP2
@@ -303,17 +325,17 @@ preparse() {
         local PAREN; getvar PAREN "TYPE$LVL"
         die "Missing '$PAREN' at end of rule: $*"
     fi
-    echo "IN GROUP: $IN"
-    local I=0
+    #echo "IN GROUP: $IN"
+    #local I=0
     # until [ "$I" = "$GROUPS" ]; do
     #     unset "GROUP$I"
     # done
 
-    out "GROUPS FOUND: $GROUPS"
-
+    #out "GROUPS FOUND: $GROUPS"
 
     #out "OUT: $DEBUG_GROUP $IN"
-    out "OUT: $DEBUG_STATE $STATE"
+    out "EXPECTED: $EXPECTED"
+    out "ACTUAL  : $DEBUG_STATE $STATE"
 
 
     # if [ "$LVL" -gt 0 ]; then
@@ -383,10 +405,31 @@ parse() {
 # PREPARSE, note of ending for each paren. connect the BEG$LVL or similr of
 # each paren to a definite end to use.
 
+    ARGS='  ( NAME )'
+EXPECTED='0 ( 0 NAME 1 ) 1'
+out $ARGS        # intentionally unquoted
+preparse $ARGS   # intentionally unquoted
+
+
+    ARGS='  [ NAME ]'
+EXPECTED='0 [ 0 NAME 0 ] 0'
+out $ARGS        # intentionally unquoted
+preparse $ARGS   # intentionally unquoted
+
 #X='  fire   ( bullet | torpedo ( traditional | smart ) | hej )   ( target NAME | randomly )'
-X='  ( ( fire ( bullet | torpedo ) ) | ( quench ) ( quack ) )'
-out $X        # intentionally unquoted
-preparse $X   # intentionally unquoted
+    ARGS='  (   (   FIRE   (   BULLET   |   TORPEDO   [   SIZE   ]   )   )   |   (   QUENCH   )   (   QUACK   )   )'
+EXPECTED='0 ( 0 ( 0 FIRE 1 ( 1 BULLET 2 | 1 TORPEDO 3 [ 3 SIZE 3 ] 3 ) 3 ) 3 | 0 ( 0 QUENCH 4 ) 4 ( 4 QUACK 5 ) 5 ) 5'
+#         0 ( 0 ( 0      1 ( 1        2 | 1         3 [ 3      3 ] 3 ) 3 ) 3 | 0 ( 0        4 ) 4 ( 4       5 ) 5 ) 5
+# LEVEL:    1   2   2      3   3        3   3         4   4      4   3   2   1   2   2        2   2   2       2   1
+# START:    0   0          1                          3                          2            2   2           2   1
+
+# before '|' = set group endstate
+#   if type bracket = endstate = startstate
+#   if type paren   = endstate = next state
+
+
+out $ARGS        # intentionally unquoted
+preparse $ARGS   # intentionally unquoted
 
 echo ">$BEG2<"
 
