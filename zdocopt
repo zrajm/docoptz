@@ -13,10 +13,8 @@ fi
 ################################################################################
 
 out() { printf '%s\n' "$*"; }
-die() {
-    printf '%s: %s\n' "${0##*/}" "$*"
-    exit 5
-}
+die() { warn "$@"; exit 5; }
+warn() { printf '%s: %s\n' "${0##*/}" "$*" >&2; :; } # always return true
 varname_or_die() {
     H="${1:+$1: }"; shift
     for V in "$@"; do
@@ -224,7 +222,7 @@ set_endstate_of_groups() {
 # 'parse' to know the end state of each parethetic group. (FIXME: Also check
 # nesting for correctness?)
 preparse() {
-    local LVL=0 GROUPS=0 GROUP0=0 IN=0 RULE='' STATE=0
+    local LVL=0 GROUPS=0 GROUP0=0 IN=0 RULE='' STATE=0 TYPE=''
     local OUT='' END='' UNTERMINATED_GROUPS='' GRP MAX_STATE=0 PREV=''
     _DEBUG_STATE=''      # used in testing
     _DEBUG_GROUP=''
@@ -250,9 +248,7 @@ preparse() {
         esac
         case "$A" in
             '('|'[')                           # start parenthesis or bracket
-                #---------------------------------------------------------------
                 incvar LVL
-                #---------------------------------------------------------------
                 GROUPS="$((GROUPS + 1))"
                 IN="$GROUPS"
 
@@ -267,25 +263,22 @@ preparse() {
                 setvar "BEG$IN" "$STATE"      #     remember opening state
                 ;;
             ']'|')')                           # end bracket
-                local TYPE; getvar TYPE "TYPE$LVL"
+                getvar TYPE "TYPE$LVL"
+                [ "$LVL" -le 0 ] && warn "Too many '$A' in rule: $*" && return 1
                 [ "$A" != "$TYPE" ] && die "Unexpected '$A' in rule (group $IN): $*"
 
                 append UNTERMINATED_GROUPS "$IN"
 
                 unset "GROUP$LVL" "TYPE$LVL"   #   remove from group stack
-                #---------------------------------------------------------------
                 decvar LVL
-                #---------------------------------------------------------------
                 getvar IN "GROUP$LVL"          #   prev group number from stack
                 ;;
             '|')                               #   pipe
                 getvar STATE "BEG$IN"          #     return state to start bracket
                 ;;
             *)                                 #   anything else
-                #---------------------------------------------------------------
                 incvar MAX_STATE
                 STATE="$MAX_STATE"
-                #---------------------------------------------------------------
                 ;;
         esac
         PREV="$A"
@@ -406,8 +399,10 @@ parse() {
 ################################################################################
 
 FAILED_TESTS=0
+TESTS_COUNT=0
 test() {
     local MSG="$1" EXPECTED="$2" GOT="$3" EXTRA="$4"
+    TESTS_COUNT="$(( TESTS_COUNT + 1 ))"
     if [ "$GOT" != "$EXPECTED" ]; then
         out "Test failed!!!"
         out "    $MSG"
@@ -425,6 +420,8 @@ tests_done() {
         printf '== %-40s ==\n' "$FAILED_TESTS tests failed!"
         printf '==============================================\n'
         exit 10
+    else
+        printf "All %s tests passed.\n" "$TESTS_COUNT"
     fi
 }
 
@@ -509,9 +506,30 @@ STATE='0 ( 0 A 1 | 0 B 1 ) 1'; FINAL=1
 GROUP='0 ( 1 A 1 | 1 B 1 ) 0'
 LEVEL='0 ( 1 A 1 | 1 B 1 ) 0'
 preparse $INPUT   # intentionally unquoted
-test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
+#test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
 test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+
+TMPDIR="$(mktemp -dt zdocpt2-XXXXXX)"
+trap "[ -d '$TMPDIR' ] && rm -r '$TMPDIR'" EXIT
+
+############################################################
+## One ')' too many
+INPUT='A )'
+preparse $INPUT 2>"$TMPDIR/a"; RETVAL="$?"
+read ERRMSG <"$TMPDIR/a"
+test 'Error message' "${0##*/}: Too many ')' in rule: A )" "$ERRMSG"
+test 'Return value'  "1"                                   "$RETVAL"
+
+############################################################
+## One ']' too many
+INPUT='A ]'
+preparse $INPUT 2>"$TMPDIR/a"; RETVAL="$?"
+read ERRMSG <"$TMPDIR/a"
+test 'Error message' "${0##*/}: Too many ']' in rule: A ]" "$ERRMSG"
+test 'Return value'  "1"                                   "$RETVAL"
+
+
 
 
 tests_done
