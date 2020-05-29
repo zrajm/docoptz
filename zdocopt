@@ -200,20 +200,20 @@ _trim_right() {
     eval "until _=\"\$$2\";$2=\"\${$2%\$1}\";[ \"\$$2\" = \"\$_\" ];do :;done"
 }
 
-# Usage: handle_endpoint GROUPSVAR STATE
+# Usage: set_endstate_of_groups GROUPSVAR STATE
 #
 # Register STATE as endpoint for each bracket group specified in the variable
 # GROUPSVAR (GROUPSVAR should contains a space separated list of bracket group
 # numbers). GROUPS is unset after processing, and variables 'BEG#' (where # is
 # each of the group numbers found in GROUPS) will be set to STATE.
-handle_endpoint() {
-    local GROUPS
+set_endstate_of_groups() {
+    local GROUP GROUPS
     getvar GROUPS "$1"
     [ "$GROUPS" ] || return
-    out --------------------------------------------------------------------------------
-    for GRP in $GROUPS; do                       # intentionally unquoted
-        setvar "END$GRP" "$STATE"
-        echo "TMP_GROUP: $GRP";
+    #out --------------------------------------------------------------------------------
+    for GROUP in $GROUPS; do                       # intentionally unquoted
+        setvar "END$GROUP" "$STATE"
+        #echo "GROUP: $GROUP";
     done
     unset "$1"
 }
@@ -225,8 +225,10 @@ handle_endpoint() {
 # nesting for correctness?)
 preparse() {
     local LVL=0 GROUPS=0 GROUP0=0 IN=0 RULE='' STATE=0
-    local OUT='' TRIMMED END='' UNTERMINATED_GROUPS='' GRP MAX_STATE=0 PREV=''
-    local DEBUG_STATE='' DEBUG_GROUP=''
+    local OUT='' END='' UNTERMINATED_GROUPS='' GRP MAX_STATE=0 PREV=''
+    _DEBUG_STATE=''      # used in testing
+    _DEBUG_GROUP=''
+    _DEBUG_LEVEL=''
     # LVL is the current level of nesting. GROUPS in the number of the current
     # parenthesis. In '()()' GROUPS is 1 and 2, and LVL 0 and 1. In '(())' GROUPS
     # is also 1 & 2, but LVL is 0 (outside paren), 1 (inside first paren), and
@@ -239,18 +241,17 @@ preparse() {
     # parenthetical group at the end.
     local GROUP0=0 # group at LVL zero is group number zero
     for A in "$@"; do
-        TRIMMED="$STATE"; trim_right '_0' TRIMMED
-        append DEBUG_STATE "$TRIMMED $A"
-        append DEBUG_GROUP "$IN $A"
+        append _DEBUG_STATE "$STATE $A"
+        append _DEBUG_GROUP "$IN $A"
+        append _DEBUG_LEVEL "$LVL $A"
         case "$A" in
             ']'|')') :;;
-            *) handle_endpoint UNTERMINATED_GROUPS "$STATE";;
+            *) set_endstate_of_groups UNTERMINATED_GROUPS "$STATE";;
         esac
         case "$A" in
             '('|'[')                           # start parenthesis or bracket
                 #---------------------------------------------------------------
                 incvar LVL
-                #push_state LVL STATE
                 #---------------------------------------------------------------
                 GROUPS="$((GROUPS + 1))"
                 IN="$GROUPS"
@@ -274,8 +275,6 @@ preparse() {
                 unset "GROUP$LVL" "TYPE$LVL"   #   remove from group stack
                 #---------------------------------------------------------------
                 decvar LVL
-                #pop_state LVL STATE            #   decrement LVL, remove last substate
-                #inc_state STATE
                 #---------------------------------------------------------------
                 getvar IN "GROUP$LVL"          #   prev group number from stack
                 ;;
@@ -307,19 +306,22 @@ preparse() {
         # DEBUG_INDENT="$DEBUG_INDENT_NEXT"
     done
     unset "GROUP0"  # last element of group stack
-    handle_endpoint UNTERMINATED_GROUPS "$STATE"
+    set_endstate_of_groups UNTERMINATED_GROUPS "$STATE"
+    append _DEBUG_STATE "$STATE"
+    append _DEBUG_GROUP "$IN"
+    append _DEBUG_LEVEL "$LVL"
 
     # Loop through BEG0...N, and END0...N and output together
     local NUM=1 TMP TMP2
-    echo ------------------------------------------------------------
+    #echo ------------------------------------------------------------
     while getvar TMP "BEG$NUM"; [ "$TMP" ]; do
         getvar TMP2 "END$NUM"
         trim_right '_0' TMP
         trim_right '_0' TMP2
-        echo "Group $NUM: $TMP -> $TMP2"
+        #echo "Group $NUM: $TMP -> $TMP2"
         NUM="$((NUM+1))"
     done
-    echo ------------------------------------------------------------
+    #echo ------------------------------------------------------------
 
     if [ "$LVL" -ne 0 ]; then
         local PAREN; getvar PAREN "TYPE$LVL"
@@ -333,9 +335,6 @@ preparse() {
 
     #out "GROUPS FOUND: $GROUPS"
 
-    #out "OUT: $DEBUG_GROUP $IN"
-    out "EXPECTED: $EXPECTED"
-    out "ACTUAL  : $DEBUG_STATE $STATE"
 
 
     # if [ "$LVL" -gt 0 ]; then
@@ -401,14 +400,122 @@ parse() {
 }
 
 ################################################################################
+##                                                                            ##
+##  Test "Framework"                                                          ##
+##                                                                            ##
+################################################################################
 
+FAILED_TESTS=0
+test() {
+    local MSG="$1" EXPECTED="$2" GOT="$3" EXTRA="$4"
+    if [ "$GOT" != "$EXPECTED" ]; then
+        out "Test failed!!!"
+        out "    $MSG"
+        [ "$EXTRA" ] && out "    EXTRA   :  $EXTRA"
+        out "    EXPECTED: >$EXPECTED<"
+        out "    GOT     : >$GOT<"
+        incvar FAILED_TESTS
+    fi
+}
+
+tests_done() {
+    if [ "$FAILED_TESTS" -gt 0 ]; then
+        printf '==============================================\n'
+        printf '== %-40s ==\n' 'ERRORS!!!!!!!!!!!!11111!!!'
+        printf '== %-40s ==\n' "$FAILED_TESTS tests failed!"
+        printf '==============================================\n'
+        exit 10
+    fi
+}
+
+################################################################################
 # PREPARSE, note of ending for each paren. connect the BEG$LVL or similr of
 # each paren to a definite end to use.
 
-    ARGS='  ( NAME )'
-EXPECTED='0 ( 0 NAME 1 ) 1'
-out $ARGS        # intentionally unquoted
-preparse $ARGS   # intentionally unquoted
+
+################################################################################
+##                                                                            ##
+##  Tests                                                                     ##
+##                                                                            ##
+################################################################################
+
+# FIXME: Allowed final states!
+# FIXME: Ellipsis!
+
+############################################################
+INPUT='  (   A   )'
+STATE='0 ( 0 A 1 ) 1'; FINAL="1"
+GROUP='0 ( 1 A 1 ) 0'
+LEVEL='0 ( 1 A 1 ) 0'
+preparse $INPUT                                 # intentionally unquoted
+test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+
+############################################################
+INPUT='  (   A   )   (   B   )'
+STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'; FINAL="2"
+GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
+LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
+preparse $INPUT                                # intentionally unquoted
+test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+
+############################################################
+INPUT='  (   A   (   B   )   )'
+STATE='0 ( 0 A 1 ( 1 B 2 ) 2 ) 2'; FINAL="2"
+GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
+LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
+preparse $INPUT                                # intentionally unquoted
+test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+
+############################################################
+INPUT='  (   (   A   B   )   )'
+STATE='0 ( 0 ( 0 A 1 B 2 ) 2 ) 2'; FINAL="2"
+GROUP='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
+LEVEL='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
+preparse $INPUT                                # intentionally unquoted
+test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+
+############################################################
+INPUT='  (   (   A   )   B   )'
+STATE='0 ( 0 ( 0 A 1 ) 1 B 2 ) 2'; FINAL="2"
+GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
+LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
+preparse $INPUT                                # intentionally unquoted
+test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+
+############################################################
+INPUT='  [   A   ]'
+STATE='0 [ 0 A 1 ] 1'; FINAL="0 1"
+GROUP='0 [ 1 A 1 ] 0'
+LEVEL='0 [ 1 A 1 ] 0'
+preparse $INPUT                                # intentionally unquoted
+test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+
+############################################################
+# FIXME!! End values of paren alternatives!
+INPUT='  (   A   |   B   )'
+STATE='0 ( 0 A 1 | 0 B 1 ) 1'; FINAL=1
+GROUP='0 ( 1 A 1 | 1 B 1 ) 0'
+LEVEL='0 ( 1 A 1 | 1 B 1 ) 0'
+preparse $INPUT   # intentionally unquoted
+test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+
+
+tests_done
+exit
 
 
     ARGS='  [ NAME ]'
@@ -416,12 +523,11 @@ EXPECTED='0 [ 0 NAME 0 ] 0'
 out $ARGS        # intentionally unquoted
 preparse $ARGS   # intentionally unquoted
 
-#X='  fire   ( bullet | torpedo ( traditional | smart ) | hej )   ( target NAME | randomly )'
-    ARGS='  (   (   FIRE   (   BULLET   |   TORPEDO   [   SIZE   ]   )   )   |   (   QUENCH   )   (   QUACK   )   )'
-EXPECTED='0 ( 0 ( 0 FIRE 1 ( 1 BULLET 2 | 1 TORPEDO 3 [ 3 SIZE 3 ] 3 ) 3 ) 3 | 0 ( 0 QUENCH 4 ) 4 ( 4 QUACK 5 ) 5 ) 5'
-#         0 ( 0 ( 0      1 ( 1        2 | 1         3 [ 3      3 ] 3 ) 3 ) 3 | 0 ( 0        4 ) 4 ( 4       5 ) 5 ) 5
-# LEVEL:    1   2   2      3   3        3   3         4   4      4   3   2   1   2   2        2   2   2       2   1
-# START:    0   0          1                          3                          2            2   2           2   1
+    ARGS='  (   (   A   (   B   |   C   [   D   ]   )   )   |   (   E   )   (   F   )   )'
+EXPECTED='0 ( 0 ( 0 A 1 ( 1 B 2 | 1 C 3 [ 3 D 3 ] 3 ) 3 ) 3 | 0 ( 0 E 4 ) 4 ( 4 F 5 ) 5 ) 5'
+#         0 ( 0 ( 0   1 ( 1   2 | 1   3 [ 3   3 ] 3 ) 3 ) 3 | 0 ( 0   4 ) 4 ( 4   5 ) 5 ) 5
+# LEVEL:    1   2   2   3   3   3   3   4   4   4   3   2   1   2   2   2   2   2   2   1
+# START:    0   0       1               3                       2       2   2       2   1
 
 # before '|' = set group endstate
 #   if type bracket = endstate = startstate
