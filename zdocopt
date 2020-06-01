@@ -71,6 +71,17 @@ append() {
     eval "$1=\"\${$1:+\$$1 }\$2\""
 }
 
+# Usage: lfappend VARNAME STRING
+#
+# Append STRING to VARNAME with a space inbetween (unless VARNAME is empty, in
+# which case no space is inserted in front of STRING).
+lfappend() {
+    varname_or_die append "$1";
+    # VARNAME="${VARNAME:+$VARNAME<NEWLINE>}$2"
+    eval "$1=\"\${$1:+\$$1
+}\$2\""                                        # intentional linebreak
+}
+
 # Usage: setvar VARNAME VALUE
 #
 # Set variable VARNAME to the specified value.
@@ -271,24 +282,27 @@ _trim_right() {
 # within brackets), all higher numbers are either ']' or ')' depending on
 # whether it's a [...] or (...) group.
 preparse() {
-    local RULE=0                               # rule 'array' length
+    # '_RULES' is exported
+    _RULES=''                                   # rule 'array' length
     local STARTAT=0                            # startat 'array' length
     local STATE=0 STATECOUNT=0
     local TYPE=''
-    local OUT='' END=''
+    local OUT='' END='' LF='
+'
     _DEBUG_STATE=''      # used in testing
     _DEBUG_GROUP=''
     _DEBUG_LEVEL=''
     local LVL=0 GROUPS=0 IN=0 GROUP0=0 TYPE0=''
 
     # Loop over $@ while setting $A to current arg, and $NEXT to next arg.
-    local I=0 A='' NEXT=''
+    local I=0 A='' NEXT='' ORGSTATE=''
     while I="$(( I + 1 ))"; [ "$I" -le "$#" ]; do
         eval    A="\"\$$I\""                   # current arg
         eval NEXT="\"\$$(( I + 1 ))\""         #   next arg
         append _DEBUG_STATE "$STATE $A"
         append _DEBUG_GROUP "$IN $A"
         append _DEBUG_LEVEL "$LVL $A"
+        ORGSTATE="$STATE"
         case "$A" in
             ['(['])                           # start parenthesis or bracket
                 _incvar LVL                    #   group level
@@ -333,6 +347,9 @@ preparse() {
                         STATE="$STATECOUNT"
                         ;;
                 esac
+                lfappend _RULES "$ORGSTATE:$A -> $STATE"
+                #push RULE "$ORGSTATE:$A -> $STATE"
+                #RULE="${RULE:+$LF}$ORGSTATE:$A -> $STATE"
                 ;;
         esac
         # # DEBUG: Indented parse output
@@ -356,7 +373,6 @@ preparse() {
     append _DEBUG_STATE "$STATE"
     append _DEBUG_GROUP "$IN"
     append _DEBUG_LEVEL "$LVL"
-
     if [ "$LVL" -ne 0 ]; then
         local PAREN; getvar PAREN "TYPE$LVL"
         warn "Missing '$PAREN' at end of rule: $*"
@@ -426,9 +442,21 @@ parse() {
 ##                                                                            ##
 ################################################################################
 
+# Usage: printfmultiline FORMAT1 FORMAT2 STUFF
+printfml() {
+    local FMT="$1" FMT2="$2" X; shift 2
+    local LINE IFS='
+';  set -- $@                                  # intentionally unquoted
+    out '----------------------------------------'
+    for LINE in "$@"; do
+        printf "$FMT\n" "$LINE"
+        FMT="$FMT2"
+    done
+}
+
 FAILED_TESTS=0
 TESTS_COUNT=0
-# Arg order SHOULD BE: GOT EXPECTED [MESSAGE] 
+# Arg order SHOULD BE: GOT EXPECTED [MESSAGE]
 test() {
     local MSG="$1" EXPECTED="$2" GOT="$3" EXTRA="$4"
     TESTS_COUNT="$(( TESTS_COUNT + 1 ))"
@@ -436,8 +464,10 @@ test() {
         out "Test failed!!!"
         out "    $MSG"
         [ "$EXTRA" ] && out "    EXTRA   :  $EXTRA"
-        out "    EXPECTED: >$EXPECTED<"
-        out "    GOT     : >$GOT<"
+        printfml \
+            '    EXPECTED: %s' '              %s' "$EXPECTED"
+        printfml \
+            '     BUT GOT: %s' '              %s' "$GOT"
         incvar FAILED_TESTS
     fi
 }
@@ -533,20 +563,20 @@ ok_int() {
     return 0
 }
 
-# Usage: length ARRAY VARNAME
+# Usage: length ARRAYNAME VARNAME
 length() {
-    ok_varname length "$@" || return 1         # verify ARRAY & VARNAME
+    ok_varname length "$@" || return 1         # verify ARRAYNAME & VARNAME
     eval "local _=\${$1_:-0}"                  # get length
     ok_int length "$_" || return 1             # verify length
     eval "$2=\"\$_\""
     return 0
 }
 
-# Usage: get ARRAY INDEX VARNAME
+# Usage: get ARRAYNAME INDEX VARNAME
 #
-# Set variable VARNAME to element INDEX of ARRAY.
+# Set variable VARNAME to element INDEX of ARRAYNAME.
 get() {
-    ok_varname get "$1" "$3" || return 1       # verify ARRAY & VARNAME
+    ok_varname get "$1" "$3" || return 1       # verify ARRAYNAME & VARNAME
     ok_int     get "$2"      || return 1       # verify INDEX
     eval "local _=\${$1_:-0}"                  # get length
     ok_int 'get (array length)' "$_" || return 1 # verify length
@@ -554,12 +584,12 @@ get() {
     eval "$3=\"\$$1_$2\""
 }
 
-# Usage: push ARRAY VALUE
+# Usage: push ARRAYNAME VALUE
 #
-# Pushes VALUE onto pseudo-array 'ARRAY'. If called inside a function you
-# should also invoke `local "ARRAY$ARRAY"`, before calling this.
+# Pushes VALUE onto pseudo-array 'ARRAYNAME'. If called inside a function you
+# should also invoke `local "ARRAYNAME$ARRAYNAME"`, before calling this.
 push() {
-    ok_varname push "$1" || return 1           # verify ARRAY
+    ok_varname push "$1" || return 1           # verify ARRAYNAME
     eval "local _=\${$1_:-0}"                  # get length
     ok_int push "$_" || return 1               # verify length
     eval "${1}_$_=\"\$2\""                     # set array element
@@ -567,9 +597,9 @@ push() {
     return 0
 }
 
-# Usage: pop ARRAY VARNAME
+# Usage: pop ARRAYNAME VARNAME
 pop() {
-    ok_varname pop "$@" || return 1            # verify ARRAY & VARNAME
+    ok_varname pop "$@" || return 1            # verify ARRAYNAME & VARNAME
     eval "local _=\${$1_:-0}"                  # get length
     ok_int pop "$_" || return 1                # verify length
     if [ "$_" -le 0 ]; then
@@ -581,6 +611,17 @@ pop() {
     eval "$2=\"\$${1}_$_\""                    # get array element
     unset "${1}_$_"                            # unset last element
     return 0
+}
+
+# Usage: dump ARRAYNAME
+dump() {
+    ok_varname dump "$1" || return 1           # verify ARRAYNAME
+    length "$1" _LEN
+    local _I=-1 _VALUE=''
+    while _I="$(( _I + 1 ))"; [ "$_I" -lt "$_LEN" ]; do
+        get "$1" "$_I" _VALUE
+        out "$_VALUE"
+    done
 }
 
 ## # Usage: push ARRAY VALUE
@@ -830,172 +871,247 @@ INPUT='  A'
 LEVEL='0 A 0'
 GROUP='0 A 0'
 STATE='0 A 1'; FINAL='1'
+RULES='0:A -> 1'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  A   B'
 LEVEL='0 A 0 B 0'
 GROUP='0 A 0 B 0'
 STATE='0 A 1 B 2'; FINAL='2'
+RULES='0:A -> 1
+1:B -> 2'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  (   A   )   B'
 LEVEL='0 ( 1 A 1 ) 0 B 0'
 GROUP='0 ( 1 A 1 ) 0 B 0'
 STATE='0 ( 0 A 1 ) 1 B 2'; FINAL='2'
+RULES='0:A -> 1
+1:B -> 2'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  (   A   )   (   B   )'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
 STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'; FINAL='2'
+RULES='0:A -> 1
+1:B -> 2'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  (   (   A   )   B   )'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
 GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
 STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1'; FINAL='1'
+RULES='0:A -> 2
+2:B -> 1'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  (   A   (   B   )   )'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
 GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
 STATE='0 ( 0 A 2 ( 2 B 3 ) 3 ) 3'; FINAL='3' # (state 1 never used)
+RULES='0:A -> 2
+2:B -> 3'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  (   A   (   B   (   C   )   )   )'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0'
 GROUP='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0'
 STATE='0 ( 0 A 2 ( 2 B 4 ( 4 C 5 ) 5 ) 5 ) 5'; FINAL='3' # (state 1 & 3 never used)
+RULES='0:A -> 2
+2:B -> 4
+4:C -> 5'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   X'
 LEVEL='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 X 0'
 GROUP='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 X 0'
 STATE='0 ( 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ) 1 X 8'
+RULES='0:A -> 2
+2:B -> 3
+3:C -> 1
+0:D -> 4
+4:E -> 5
+5:F -> 1
+0:G -> 6
+6:H -> 7
+7:I -> 1
+1:X -> 8'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   X'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
 STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 X 8'
+## FIXME: These rules should account for the [...]
+RULES='0:A -> 2
+2:B -> 3
+3:C -> 1
+0:D -> 4
+4:E -> 5
+5:F -> 1
+0:G -> 6
+6:H -> 7
+7:I -> 1
+1:X -> 8'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...  X'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
 STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 ... 1 X 8'
+## FIXME: These rules should account for the [...] and '...'
+RULES='0:A -> 2
+2:B -> 3
+3:C -> 1
+0:D -> 4
+4:E -> 5
+5:F -> 1
+0:G -> 6
+6:H -> 7
+7:I -> 1
+1:X -> 8'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  (   A   )'
 LEVEL='0 ( 1 A 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0'
 STATE='0 ( 0 A 1 ) 1'; FINAL="1"
+RULES='0:A -> 1'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  (   A   )   (   B   )'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
 STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'; FINAL="2"
+RULES='0:A -> 1
+1:B -> 2'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  (   A   (   B   )   )'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
 GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
 STATE='0 ( 0 A 2 ( 2 B 3 ) 3 ) 3'; FINAL="2"
+RULES='0:A -> 2
+2:B -> 3'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  (   (   A   B   )   )'
 LEVEL='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
 GROUP='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
 STATE='0 ( 0 ( 0 A 3 B 2 ) 2 ) 2'; FINAL="2"
+RULES='0:A -> 3
+3:B -> 2'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  (   (   A   )   B   )'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
 GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
 STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1'; FINAL="2"
+RULES='0:A -> 2
+2:B -> 1'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 INPUT='  [   A   ]'
 LEVEL='0 [ 1 A 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0'
 STATE='0 [ 0 A 1 ] 1'; FINAL="0 1"
+## FIXME: These rules should account for the [...]
+RULES='0:A -> 1'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
-# FIXME!! End values of paren alternatives!
 INPUT='  (   A   |   B   )'
 LEVEL='0 ( 1 A 1 | 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 | 1 B 1 ) 0'
 STATE='0 ( 0 A 1 | 0 B 1 ) 1'; FINAL=1
+RULES='0:A -> 1
+0:B -> 1'
 preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_RULES"       "$INPUT"
 
 tests_done
 exit
