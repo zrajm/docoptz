@@ -1,5 +1,24 @@
 #!/bin/sh
 
+# while I="$(( I + 1 ))"; [ "$I" -le "$#" ]; do
+#     eval "A=\"\$$I\"; NEXT=\"\$$(( I + 1 ))\""
+#     echo "$A $NEXT"
+
+# done
+# exit
+
+# X=1
+# for NEXT in "$@" ''; do
+#     if [ ! "$X" ]; then
+#     echo ">>>$A"
+
+#     fi
+#     A="$NEXT"
+# done
+
+# exit
+
+
 #DEBUG=1
 if [ "$DEBUG" ]; then
     DEBUG() { {
@@ -18,7 +37,7 @@ warn() { printf '%s: %s\n' "${0##*/}" "$*" >&2; :; } # always return true
 varname_or_die() {
     H="${1:+$1: }"; shift
     for V in "$@"; do
-        case "$V" in *[!A-Z0-9_]*|[0-9]*) die "${H}Bad varname '$V'"; esac
+        case "$V" in *[!A-Z0-9_]*|[0-9]*) die "${H}Bad variable name '$V'"; esac
     done
 }
 int_or_die() {
@@ -198,90 +217,124 @@ _trim_right() {
     eval "until _=\"\$$2\";$2=\"\${$2%\$1}\";[ \"\$$2\" = \"\$_\" ];do :;done"
 }
 
-# Usage: set_endstate_of_groups GROUPSVAR STATE
-#
-# Register STATE as endpoint for each bracket group specified in the variable
-# GROUPSVAR (GROUPSVAR should contains a space separated list of bracket group
-# numbers). GROUPS is unset after processing, and variables 'BEG#' (where # is
-# each of the group numbers found in GROUPS) will be set to STATE.
-set_endstate_of_groups() {
-    local GROUP GROUPS
-    getvar GROUPS "$1"
-    [ "$GROUPS" ] || return
-    #out --------------------------------------------------------------------------------
-    for GROUP in $GROUPS; do                       # intentionally unquoted
-        setvar "END$GROUP" "$STATE"
-        #echo "GROUP: $GROUP";
-    done
-    unset "$1"
-}
-
 # Usage: preparse TOKENIZED
 #
 # Go through TOKENIZED and populate environment with variables needed for
 # 'parse' to know the end state of each parethetic group. (FIXME: Also check
 # nesting for correctness?)
+
+
+# Special characters
+# ==================
+#   * Group start is '[' or '('
+#   * Group end is ']' or ')'
+#   * Subgroup separator is '|'
+#   * Repeat is '...'
+#
+# The beginning of a subgroup can be attached to one or more states (if the
+# previous subgroup[s] where optional). The first part of each subgroup is
+# therefore connected to all the STARTAT states (space-separated list state
+# identifiers). The remaining group states should be the same regardless of
+# which 'entry' was taken.
+#
+
+# LVL=0 LASTSTATE=0 STARTAT=0
+#
+# Processing '[' and '(' (the same):
+#   incvar LVL LASTSTATE
+#   for BEGSTATE in $STARTAT; do
+#       add rule "BEGSTATE:$ARG -> $LASTSTATE"
+#   done
+#
+# Processing ']' and ')' (almost the same):
+#   decval LVL
+#   if ']':
+#       add rule '
+#
+# Processing '|':
+# Processing '...':
+#
+
+# LVL is the current level of nesting. GROUPS in the number of the current
+# parenthesis. In '()()' GROUPS is 1 and 2, and LVL 0 and 1. In '(())' GROUPS
+# is also 1 & 2, but LVL is 0 (outside paren), 1 (inside first paren), and 2
+# (inside innermost paren). I.e. GROUPS never decreases, while LVL does. IN is
+# the current group we're in, so in '()()' it looks like this '0(1)0(2)0',
+# while in '(())' its '0(1(2)1)0'.
+
+#
+# GROUP0...N is a pseudo-array containing group stack. It has no meaning
+# outside this loop. It contains the group number of the current parenthetical
+# group at the end.
+#
+# TYPE0...N is pseudo-array containing group type. TYPE0='' (because its not
+# within brackets), all higher numbers are either ']' or ')' depending on
+# whether it's a [...] or (...) group.
 preparse() {
-    local LVL=0 GROUPS=0 GROUP0=0 IN=0 RULE='' STATE=0 TYPE=''
-    local OUT='' END='' UNTERMINATED_GROUPS='' GRP MAX_STATE=0 PREV=''
+    local RULE=0                               # rule 'array' length
+    local STARTAT=0                            # startat 'array' length
+    local STATE=0 STATECOUNT=0
+    local TYPE=''
+    local OUT='' END=''
     _DEBUG_STATE=''      # used in testing
     _DEBUG_GROUP=''
     _DEBUG_LEVEL=''
-    # LVL is the current level of nesting. GROUPS in the number of the current
-    # parenthesis. In '()()' GROUPS is 1 and 2, and LVL 0 and 1. In '(())' GROUPS
-    # is also 1 & 2, but LVL is 0 (outside paren), 1 (inside first paren), and
-    # 2 (inside innermost paren). I.e. GROUPS never decreases, while LVL does.
-    # IN is the current group we're in, so in '()()' it looks like this
-    # '0(1)0(2)0', while in '(())' its '0(1(2)1)0'.
+    local LVL=0 GROUPS=0 IN=0 GROUP0=0 TYPE0=''
 
-    # GROUP0...N is a pseudo-array containing group stack. It has no meaning
-    # outside this loop. It contains the group number of the current
-    # parenthetical group at the end.
-    local GROUP0=0 # group at LVL zero is group number zero
-    for A in "$@"; do
+    # Loop over $@ while setting $A to current arg, and $NEXT to next arg.
+    local I=0 A='' NEXT=''
+    while I="$(( I + 1 ))"; [ "$I" -le "$#" ]; do
+        eval    A="\"\$$I\""                   # current arg
+        eval NEXT="\"\$$(( I + 1 ))\""         #   next arg
         append _DEBUG_STATE "$STATE $A"
         append _DEBUG_GROUP "$IN $A"
         append _DEBUG_LEVEL "$LVL $A"
         case "$A" in
-            ']'|')') :;;
-            *) set_endstate_of_groups UNTERMINATED_GROUPS "$STATE";;
-        esac
-        case "$A" in
-            '('|'[')                           # start parenthesis or bracket
-                incvar LVL
-                GROUPS="$((GROUPS + 1))"
-                IN="$GROUPS"
-
-                local "GROUP$LVL" "TYPE$LVL"
-                setvar "GROUP$LVL" "$GROUPS"   # loop stack of group numbers
-                case "$A" in                   # loop stack of bracket types
-                    '(') setvar "TYPE$LVL" ')' ;;
-                    '[') setvar "TYPE$LVL" ']' ;;
+            ['(['])                           # start parenthesis or bracket
+                _incvar LVL                    #   group level
+                _incvar GROUPS                 #   group number
+                IN="$GROUPS"                   #   current group number
+                local "GROUP$LVL"="$GROUPS"    #   loop stack: group number stack
+                case "$A" in                   #   loop stack: group types
+                    '(') local "TYPE$LVL"=')' ;;
+                    '[') local "TYPE$LVL"=']' ;;
                 esac
-
-                local "BEG$IN"
-                setvar "BEG$IN" "$STATE"      #     remember opening state
+                local "BEG$IN"="$STATE"        #   array: group start state
+                _incvar STATECOUNT
+                local "END$IN"="$STATECOUNT"   #   array: group end state
                 ;;
-            ']'|')')                           # end bracket
-                getvar TYPE "TYPE$LVL"
-                [ "$LVL" -le 0 ] && warn "Too many '$A' in rule: $*" && return 1
-                [ "$A" != "$TYPE" ] && die "Unexpected '$A' in rule (group $IN): $*"
+            ['])'])                           # end bracket
+                _getvar TYPE "TYPE$LVL"
+                [ "$LVL" -le 0    ] && warn "Too many '$A' in rule: $*" && return 1
+                [ "$A" != "$TYPE" ] && warn "Missing '$A' in rule (group $IN): $*" && return 1
 
-                append UNTERMINATED_GROUPS "$IN"
+                #getvar STATE "END$IN"          #     return state to start bracket
 
                 unset "GROUP$LVL" "TYPE$LVL"   #   remove from group stack
-                decvar LVL
-                getvar IN "GROUP$LVL"          #   prev group number from stack
+                _decvar LVL                    #   go down one level
+                _getvar IN "GROUP$LVL"         #   current group number
+                case "$NEXT" in [')]'])
+                    local "END$IN"="$STATE"
+                esac
+
                 ;;
             '|')                               #   pipe
-                getvar STATE "BEG$IN"          #     return state to start bracket
+                _getvar STATE "BEG$IN"         #     return state to start bracket
+                ;;
+            '...')
                 ;;
             *)                                 #   anything else
-                incvar MAX_STATE
-                STATE="$MAX_STATE"
+                case "$NEXT" in
+                    ['|)]'])
+                        _getvar STATE "END$IN"
+                        ;;
+                    *)
+                        _incvar STATECOUNT
+                        STATE="$STATECOUNT"
+                        ;;
+                esac
                 ;;
         esac
-        PREV="$A"
         # # DEBUG: Indented parse output
         # local DEBUG_INDENT DEBUG_INDENT_NEXT
         # case "$A" in
@@ -299,42 +352,17 @@ preparse() {
         # DEBUG_INDENT="$DEBUG_INDENT_NEXT"
     done
     unset "GROUP0"  # last element of group stack
-    set_endstate_of_groups UNTERMINATED_GROUPS "$STATE"
+    unset "TYPE0"
     append _DEBUG_STATE "$STATE"
     append _DEBUG_GROUP "$IN"
     append _DEBUG_LEVEL "$LVL"
 
-    # Loop through BEG0...N, and END0...N and output together
-    local NUM=1 TMP TMP2
-    #echo ------------------------------------------------------------
-    while getvar TMP "BEG$NUM"; [ "$TMP" ]; do
-        getvar TMP2 "END$NUM"
-        trim_right '_0' TMP
-        trim_right '_0' TMP2
-        #echo "Group $NUM: $TMP -> $TMP2"
-        NUM="$((NUM+1))"
-    done
-    #echo ------------------------------------------------------------
-
     if [ "$LVL" -ne 0 ]; then
         local PAREN; getvar PAREN "TYPE$LVL"
-        die "Missing '$PAREN' at end of rule: $*"
+        warn "Missing '$PAREN' at end of rule: $*"
+        return 1
     fi
-    #echo "IN GROUP: $IN"
-    #local I=0
-    # until [ "$I" = "$GROUPS" ]; do
-    #     unset "GROUP$I"
-    # done
-
-    #out "GROUPS FOUND: $GROUPS"
-
-
-
-    # if [ "$LVL" -gt 0 ]; then
-    #     die "Too few ending parentheses!!"
-    # fi
 }
-
 
 parse() {
     out "$*"
@@ -400,6 +428,7 @@ parse() {
 
 FAILED_TESTS=0
 TESTS_COUNT=0
+# Arg order SHOULD BE: GOT EXPECTED [MESSAGE] 
 test() {
     local MSG="$1" EXPECTED="$2" GOT="$3" EXTRA="$4"
     TESTS_COUNT="$(( TESTS_COUNT + 1 ))"
@@ -414,6 +443,7 @@ test() {
 }
 
 tests_done() {
+    TESTS_DONE=1
     if [ "$FAILED_TESTS" -gt 0 ]; then
         printf '==============================================\n'
         printf '== %-40s ==\n' 'ERRORS!!!!!!!!!!!!11111!!!'
@@ -424,6 +454,177 @@ tests_done() {
         printf "All %s tests passed.\n" "$TESTS_COUNT"
     fi
 }
+
+
+################################################################################
+##                                                                            ##
+##  'Array' stuff                                                             ##
+##                                                                            ##
+################################################################################
+
+## Some pseudo-array idioms for dash:
+##
+## Init: Create length counter (nothing more):
+##
+##     local NAME="0"
+##
+## Push: Put content into variable named NAME# (where # is the number of the
+## element added) then increment length counter by one.
+##
+##     local "NAME$NAME"="SOMETHING"; $NAME="$(( NAME + 1))"
+##
+## Pop: First decrement length counter then get and unset the last element.
+##
+##     NAME="$(( NAME - 1 ))"; eval "VALUE=\"\$NAME$NAME\""; unset "NAME$NAME"
+##
+## Change value:
+##
+##     local "NAME$NAME"="NEW VALUE"
+##
+## Loop over:
+##
+##     local I=-1
+##     while I="$(( I + 1 ))"; [ "$I" -lt "$NAME" ]; do
+##         eval "VALUE=\"\$NAME$I\""
+##         # do stuff here
+##     done
+##
+## Go through and empty a stack (backwards order).
+##
+##     while [ "$NAME" -gt 0 ]; do
+##         NAME="$(( NAME - 1 ))"; eval "VALUE=\"\$NAME$NAME\""; unset "NAME$NAME"
+##         echo "NAME:$NAME"
+##         echo "$VALUE"
+##     done
+##
+## Go through and empty a stack from first to last item (array will be invalid
+## during traversal but in valid state after loop is done).
+##
+##     local I=-1
+##     while I="$(( I + 1 ))"; [ "$I" -lt "$NAME" ]; do
+##         eval "VALUE=\"\$NAME$I\""; unset "NAME$I"
+##         echo "NAME:$NAME"
+##         echo "$VALUE"
+##     done
+##     NAME=0
+##
+
+ok_varname() {
+    H="${1:+$1: }"; shift
+    for V in "$@"; do
+        case "$V" in
+            *[!A-Z0-9_]*|[0-9]*)
+                warn "${H}Bad variable name '$V'"
+                return 1
+        esac
+    done
+    return 0
+}
+
+ok_int() {
+    H="${1:+$1: }"; shift
+    for V in "$@"; do
+        case "$V" in
+            *[!0-9]*)
+                warn "${H}Bad integer '$V'"
+                return 1
+        esac
+    done
+    return 0
+}
+
+# Usage: length ARRAY VARNAME
+length() {
+    ok_varname length "$@" || return 1         # verify ARRAY & VARNAME
+    eval "local _=\${$1_:-0}"                  # get length
+    ok_int length "$_" || return 1             # verify length
+    eval "$2=\"\$_\""
+    return 0
+}
+
+# Usage: get ARRAY INDEX VARNAME
+#
+# Set variable VARNAME to element INDEX of ARRAY.
+get() {
+    ok_varname get "$1" "$3" || return 1       # verify ARRAY & VARNAME
+    ok_int     get "$2"      || return 1       # verify INDEX
+    eval "local _=\${$1_:-0}"                  # get length
+    ok_int 'get (array length)' "$_" || return 1 # verify length
+    [ "$2" -ge "$_" ] && warn "get: Index '$2' too large (max is '$((_ - 1))')" && return 1
+    eval "$3=\"\$$1_$2\""
+}
+
+# Usage: push ARRAY VALUE
+#
+# Pushes VALUE onto pseudo-array 'ARRAY'. If called inside a function you
+# should also invoke `local "ARRAY$ARRAY"`, before calling this.
+push() {
+    ok_varname push "$1" || return 1           # verify ARRAY
+    eval "local _=\${$1_:-0}"                  # get length
+    ok_int push "$_" || return 1               # verify length
+    eval "${1}_$_=\"\$2\""                     # set array element
+    eval "${1}_=$(( $_ + 1 ))"                 # increase length
+    return 0
+}
+
+# Usage: pop ARRAY VARNAME
+pop() {
+    ok_varname pop "$@" || return 1            # verify ARRAY & VARNAME
+    eval "local _=\${$1_:-0}"                  # get length
+    ok_int pop "$_" || return 1                # verify length
+    if [ "$_" -le 0 ]; then
+        warn "pop: Array '$1' is empty"
+        return 1
+    fi
+    eval "_=$(( _ - 1 ))"                      # length - 1
+    eval "${1}_=\"\$_\""                       # decrease length
+    eval "$2=\"\$${1}_$_\""                    # get array element
+    unset "${1}_$_"                            # unset last element
+    return 0
+}
+
+## # Usage: push ARRAY VALUE
+## #
+## # Pushes VALUE onto pseudo-array 'ARRAY'. If called inside a function you
+## # should also invoke `local "ARRAY$ARRAY"`, before calling this.
+## push() {
+##     varname_or_die push "$1"
+##     eval "_=\$$1"; int_or_die push "$_"
+##     eval "$1$_=\"\$2\"; $1=$(( $1 + 1 ))"
+## }
+##
+## # Usage: get ARRAY VARNAME
+## #
+## # Pops last value of off ARRAY and puts it into variable named VARNAME.
+## pop() {
+##     varname_or_die pop "$@"
+##     eval "local _=\$$1"; int_or_die pop "$_"  # get array length
+##     if [ "$_" -gt 0 ]; then
+##         warn "pop: Array is empty"
+##         return 1
+##     fi
+##     _="$(( _ - 1 ))"                          # length -1
+##     eval "$2=\"\$$1$_\""                      # set VARNAME
+##     unset "$1$_"                              # unset last array element
+##     eval "$1=\"\$_\""                         # decrement array counter
+## }
+##
+## # Usage: get ARRAY INDEX VARNAME
+## #
+## # Set variable VARNAME to element INDEX of ARRAY.
+## get() {
+##     varname_or_die pop "$1" "$3"
+##     eval "local _=\$$1"; int_or_die pop "$_"
+##     if [ "$2" -ge "$_" ]; then
+##         die "get: Index '$_' must be less than array length '$_'"
+##         return 1
+##     fi
+##     eval "$3=\"\$$1$2\""
+## }
+
+################################################################################
+
+
 
 ################################################################################
 # PREPARSE, note of ending for each paren. connect the BEG$LVL or similr of
@@ -440,97 +641,361 @@ tests_done() {
 # FIXME: Ellipsis!
 
 ############################################################
-INPUT='  (   A   )'
-STATE='0 ( 0 A 1 ) 1'; FINAL="1"
-GROUP='0 ( 1 A 1 ) 0'
-LEVEL='0 ( 1 A 1 ) 0'
-preparse $INPUT                                 # intentionally unquoted
-test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
-test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
-test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
-
-############################################################
-INPUT='  (   A   )   (   B   )'
-STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'; FINAL="2"
-GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
-LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
-preparse $INPUT                                # intentionally unquoted
-test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
-test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
-test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
-
-############################################################
-INPUT='  (   A   (   B   )   )'
-STATE='0 ( 0 A 1 ( 1 B 2 ) 2 ) 2'; FINAL="2"
-GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
-LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
-preparse $INPUT                                # intentionally unquoted
-test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
-test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
-test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
-
-############################################################
-INPUT='  (   (   A   B   )   )'
-STATE='0 ( 0 ( 0 A 1 B 2 ) 2 ) 2'; FINAL="2"
-GROUP='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
-LEVEL='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
-preparse $INPUT                                # intentionally unquoted
-test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
-test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
-test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
-
-############################################################
-INPUT='  (   (   A   )   B   )'
-STATE='0 ( 0 ( 0 A 1 ) 1 B 2 ) 2'; FINAL="2"
-GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
-LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
-preparse $INPUT                                # intentionally unquoted
-test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
-test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
-test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
-
-############################################################
-INPUT='  [   A   ]'
-STATE='0 [ 0 A 1 ] 1'; FINAL="0 1"
-GROUP='0 [ 1 A 1 ] 0'
-LEVEL='0 [ 1 A 1 ] 0'
-preparse $INPUT                                # intentionally unquoted
-test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
-test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
-test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
-
-############################################################
-# FIXME!! End values of paren alternatives!
-INPUT='  (   A   |   B   )'
-STATE='0 ( 0 A 1 | 0 B 1 ) 1'; FINAL=1
-GROUP='0 ( 1 A 1 | 1 B 1 ) 0'
-LEVEL='0 ( 1 A 1 | 1 B 1 ) 0'
-preparse $INPUT   # intentionally unquoted
-#test "States"           "$STATE" "$_DEBUG_STATE" "$INPUT"
-test "Subgroup numbers" "$GROUP" "$_DEBUG_GROUP" "$INPUT"
-test "Bracket level"    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
-
+TESTS_DONE=''
 TMPDIR="$(mktemp -dt zdocpt2-XXXXXX)"
-trap "[ -d '$TMPDIR' ] && rm -r '$TMPDIR'" EXIT
+TMPNUM="0"
+BIN="${0##*/}"
+trap "trap - EXIT INT
+     [ -d '$TMPDIR' ] && rm -r '$TMPDIR';
+     [ \"\$TESTS_DONE\" ] || out '***PREMATURE EXIT! Not all tests ran!';
+     exit" EXIT INT
 
-############################################################
+# Usage: inctmp VARNAME
+#
+# Sets variable VARNAME to next suitable tempfile.
+inctmp() { setvar "$1" "$TMPDIR/$TMPNUM"; incvar TMPNUM; }
+
+######################################################################
+##
+##  Test get()
+##
+
+# get: Bad 1st arg, ARRAY is a number instead of ARRAY name
+inctmp TMPFILE
+ARRAY="original"
+get 666 0 ARRAY 2>"$TMPFILE"; RETVAL="$?"
+read ERRMSG <"$TMPFILE"
+test 'Return value'       "1"                                  "$RETVAL"
+test 'Error message'      "$BIN: get: Bad variable name '666'" "$ERRMSG"
+test 'Variable unchanged' "$ARRAY"                             "original"
+
+# get: Bad 1st arg, ARRAY with malformed length
+inctmp TMPFILE
+ARRAY_=-1                                      # malformed 'array' (bad length)
+VARNAME=42
+get ARRAY 3 VARNAME 2>"$TMPFILE"; RETVAL="$?"
+read ERRMSG <"$TMPFILE"
+test 'Return value'       "1"                           "$RETVAL"
+test 'Error message'      "$BIN: get (array length): Bad integer '-1'" "$ERRMSG"
+test 'Variable unchanged' "$VARNAME"                    "42"
+
+# get: Bad 2nd arg, INDEX is invalid integer
+inctmp TMPFILE
+ARRAY="original"          # (a non-array)
+VARNAME=42
+get ARRAY -1 VARNAME 2>"$TMPFILE"; RETVAL="$?"
+read ERRMSG <"$TMPFILE"
+test 'Return value'       "1"                           "$RETVAL"
+test 'Error message'      "$BIN: get: Bad integer '-1'" "$ERRMSG"
+test 'Variable unchanged' "$ARRAY"                      "original"
+test 'Variable unchanged' "$VARNAME"                    "42"
+
+# get: Bad 2nd arg, INDEX out of range
+inctmp TMPFILE
+ARRAY_=3; ARRAY_0="a"; ARRAY_1="b"; ARRAY_2="c"            # a real 'array'
+VARNAME=42
+get ARRAY 3 VARNAME 2>"$TMPFILE"; RETVAL="$?"
+read ERRMSG <"$TMPFILE"
+test 'Return value'       "1"                           "$RETVAL"
+test 'Error message'      "$BIN: get: Index '3' too large (max is '2')" "$ERRMSG"
+test 'Variable unchanged' "$VARNAME"                    "42"
+
+# get: Bad 3rd arg, VARNAME is a number instead of variable name
+inctmp TMPFILE
+ARRAY="original"          # (a non-array)
+VARNAME=42
+get ARRAY 0 666 2>"$TMPFILE"; RETVAL="$?"
+read ERRMSG <"$TMPFILE"
+test 'Return value'       "1"                           "$RETVAL"
+test 'Error message'      "$BIN: get: Bad variable name '666'" "$ERRMSG"
+test 'Variable unchanged' "$ARRAY"                      "original"
+test 'Variable unchanged' "$VARNAME"                    "42"
+
+# get: Good args
+inctmp TMPFILE
+ARRAY_=3; ARRAY_0="a"; ARRAY_1="b"; ARRAY_2="c"            # a real 'array'
+VARNAME=42
+get ARRAY 2 VARNAME 2>"$TMPFILE"; RETVAL="$?"
+read ERRMSG <"$TMPFILE"
+test 'Return value'       "0"                           "$RETVAL"
+test 'Variable changed'   "$VARNAME"                    "c"
+
+######################################################################
+##
+##  Test push(), get(), length() and pop()
+##  FIXME: Break these apart and test them more thoroughly
+
+ORG_="$_"
+push X a
+length X LEN
+test 'Length'        '1'     "$LEN"
+test '$X_ (length)'  '1'     "$X_"
+test '$X_0'          'a'     "$X_0"
+test '$X_1'          ''      "$X_1"
+test 'leaking $_?'   "$ORG_" "$_"
+
+push X b
+length X LEN
+test 'Length'        '2'     "$LEN"
+test '$X_ (length)'  '2'     "$X_"
+test '$X_0'          'a'     "$X_0"
+test '$X_1'          'b'     "$X_1"
+test '$X_2'          ''      "$X_2"
+test 'leaking $_?'   "$ORG_" "$_"
+
+get X 0 VAL
+length X LEN
+test 'Length'        '2'     "$LEN"
+test '$X_ (length)'  '2'     "$X_"
+test '$X_0'          'a'     "$X_0"
+test '$X_1'          'b'     "$X_1"
+test '$X_2'          ''      "$X_2"
+test 'leaking $_?'   "$ORG_" "$_"
+
+pop X VALUE
+length X LEN
+test 'Gotted value'  'b'     "$VALUE"
+test 'Length'        '1'     "$LEN"
+test '$X_ (length)'  '1'     "$X_"
+test '$X_0'          'a'     "$X_0"
+test '$X_1'          ''      "$X_1"
+test 'leaking $_?'   "$ORG_" "$_"
+
+pop X VALUE
+length X LEN
+test 'Gotted value'  'a'     "$VALUE"
+test 'Length'        '0'     "$LEN"
+test '$X_ (length)'  '0'     "$X_"
+test '$X_0'          ''      "$X_0"
+test '$X_1'          ''      "$X_1"
+test 'leaking $_?'   "$ORG_" "$_"
+
+inctmp TMPFILE
+pop X VALUE 2>"$TMPFILE"; RETVAL="$?"      # intentionally unquoted
+read ERRMSG <"$TMPFILE"
+test 'Return value'  "1" "$RETVAL"
+test 'Error message' "$BIN: pop: Array 'X' is empty" "$ERRMSG"
+
+######################################################################
+##
+##  Test preparse() error messages
+##
+
 ## One ')' too many
 INPUT='A )'
-preparse $INPUT 2>"$TMPDIR/a"; RETVAL="$?"
-read ERRMSG <"$TMPDIR/a"
-test 'Error message' "${0##*/}: Too many ')' in rule: A )" "$ERRMSG"
-test 'Return value'  "1"                                   "$RETVAL"
+inctmp TMPFILE
+preparse $INPUT 2>"$TMPFILE"; RETVAL="$?"      # intentionally unquoted
+read ERRMSG <"$TMPFILE"
+test 'Return value'  "1" "$RETVAL"
+test 'Error message' "$BIN: Too many ')' in rule: A )" "$ERRMSG"
 
-############################################################
 ## One ']' too many
 INPUT='A ]'
-preparse $INPUT 2>"$TMPDIR/a"; RETVAL="$?"
-read ERRMSG <"$TMPDIR/a"
-test 'Error message' "${0##*/}: Too many ']' in rule: A ]" "$ERRMSG"
-test 'Return value'  "1"                                   "$RETVAL"
+inctmp TMPFILE
+preparse $INPUT 2>"$TMPFILE"; RETVAL="$?"      # intentionally unquoted
+read ERRMSG <"$TMPFILE"
+test 'Return value'  "1" "$RETVAL"
+test 'Error message' "$BIN: Too many ']' in rule: A ]" "$ERRMSG"
 
+## Missing ')'
+INPUT='[ A )'
+inctmp TMPFILE
+preparse $INPUT 2>"$TMPFILE"; RETVAL="$?"      # intentionally unquoted
+read ERRMSG <"$TMPFILE"
+test 'Return value'  "1" "$RETVAL"
+test 'Error message' "$BIN: Missing ')' in rule (group 1): [ A )" "$ERRMSG"
 
+## Missing ']'
+INPUT='( A ]'
+inctmp TMPFILE
+preparse $INPUT 2>"$TMPFILE"; RETVAL="$?"
+read ERRMSG <"$TMPFILE"
+test 'Return value'  "1" "$RETVAL"
+test 'Error message' "$BIN: Missing ']' in rule (group 1): ( A ]" "$ERRMSG"
 
+## Missing ']'
+INPUT='( A'
+inctmp TMPFILE
+preparse $INPUT 2>"$TMPFILE"; RETVAL="$?"
+read ERRMSG <"$TMPFILE"
+test 'Return value'  "1" "$RETVAL"
+test 'Error message' "$BIN: Missing ')' at end of rule: ( A" "$ERRMSG"
+
+######################################################################
+##
+##  Test Actual Results
+##
+
+INPUT='  A'
+LEVEL='0 A 0'
+GROUP='0 A 0'
+STATE='0 A 1'; FINAL='1'
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  A   B'
+LEVEL='0 A 0 B 0'
+GROUP='0 A 0 B 0'
+STATE='0 A 1 B 2'; FINAL='2'
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  (   A   )   B'
+LEVEL='0 ( 1 A 1 ) 0 B 0'
+GROUP='0 ( 1 A 1 ) 0 B 0'
+STATE='0 ( 0 A 1 ) 1 B 2'; FINAL='2'
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  (   A   )   (   B   )'
+LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
+GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
+STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'; FINAL='2'
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  (   (   A   )   B   )'
+LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
+GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
+STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1'; FINAL='1'
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  (   A   (   B   )   )'
+LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
+GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
+STATE='0 ( 0 A 2 ( 2 B 3 ) 3 ) 3'; FINAL='3' # (state 1 never used)
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  (   A   (   B   (   C   )   )   )'
+LEVEL='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0'
+GROUP='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0'
+STATE='0 ( 0 A 2 ( 2 B 4 ( 4 C 5 ) 5 ) 5 ) 5'; FINAL='3' # (state 1 & 3 never used)
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   X'
+LEVEL='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 X 0'
+GROUP='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 X 0'
+STATE='0 ( 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ) 1 X 8'
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   X'
+LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
+GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
+STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 X 8'
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...  X'
+LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
+GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
+STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 ... 1 X 8'
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  (   A   )'
+LEVEL='0 ( 1 A 1 ) 0'
+GROUP='0 ( 1 A 1 ) 0'
+STATE='0 ( 0 A 1 ) 1'; FINAL="1"
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  (   A   )   (   B   )'
+LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
+GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
+STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'; FINAL="2"
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  (   A   (   B   )   )'
+LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
+GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
+STATE='0 ( 0 A 2 ( 2 B 3 ) 3 ) 3'; FINAL="2"
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  (   (   A   B   )   )'
+LEVEL='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
+GROUP='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
+STATE='0 ( 0 ( 0 A 3 B 2 ) 2 ) 2'; FINAL="2"
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  (   (   A   )   B   )'
+LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
+GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
+STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1'; FINAL="2"
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+INPUT='  [   A   ]'
+LEVEL='0 [ 1 A 1 ] 0'
+GROUP='0 [ 1 A 1 ] 0'
+STATE='0 [ 0 A 1 ] 1'; FINAL="0 1"
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+
+# FIXME!! End values of paren alternatives!
+INPUT='  (   A   |   B   )'
+LEVEL='0 ( 1 A 1 | 1 B 1 ) 0'
+GROUP='0 ( 1 A 1 | 1 B 1 ) 0'
+STATE='0 ( 0 A 1 | 0 B 1 ) 1'; FINAL=1
+preparse $INPUT; RETVAL="$?"                   # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
 
 tests_done
 exit
@@ -556,83 +1021,5 @@ out $ARGS        # intentionally unquoted
 preparse $ARGS   # intentionally unquoted
 
 echo ">$BEG2<"
-
-exit
-
-__END__
-################################################################################
-################################################################################
-################################################################################
-################################################################################
-################################################################################
-
-
-#           1.0      1.1      1.2           1.2.1
-X='0 fire 1 ( bullet | torpedo ( traditional | smart ) ) 2 ( target NAME | randomly ) 3'
-X='  fire   ( bullet | torpedo ( traditional | smart ) )   ( target NAME | randomly ) 3'
-
-cat <<EXPECTED
-$X
-0:fire -> 1
-1:bullet -> 2
-1:torpedo -> 1.1
-1.1:traditional -> 1.
-
-EXPECTED
-
-
-exit
-:<<'BLOCK_COMMENT'
-
-#parse thingy '(' ')' '(' ')' '(' ')' '(' ')'
-
-parse thingy '[' tool '|' lamp ']' '(' on '|' off ')' '(' green '|' blue ')'
-
-echo --------------------------------------------------------------------------------
-X="( lamp | machine ) ( on | off | dim VALUE )"
-
-cat <<EOF
-EXPECTED
-$X
-0:lamp -> 1
-0:machine -> 1
-1:on -> 2
-1:off -> 2
-1:dim -> 1.1
-1.1:* -> 2
-EOF
-
-parse $X
-
-echo --------------------------------------------------------------------------------
-X="0 ( 0.0 a 0.1 (0.1.0 b 0.1.1 (0.1.1.0 c 0.1.1.1 )  ) ) 1"
-X="( a ( b ( c ) ) )"
-cat <<EOF
-EXPECTED
-$X
-0:a -> 0.1
-0.1:b -> 0.1.0
-1.1:c -> 1
-EOF
-
-parse $X
-
-BLOCK_COMMENT
-
-echo --------------------------------------------------------------------------------
-LINE='my_program go ( --up | --down | --left | --right )'
-
-cat <<EXPECTED
-$LINE
-0:go -> 1
-1:--up -> 2
-1:--down -> 2
-1:--left -> 2
-1:--right -> 2
-DONE=2
---------------------
-EXPECTED
-LINE="${LINE#* }"
-parse $LINE
 
 #[eof]
