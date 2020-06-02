@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# FIXME: Clean up unused code
+# FIXME: Remove dead code
 # FIXME: is pop/push etc used? If not move to different file.
 
 #DEBUG=1
@@ -19,12 +19,14 @@ out() { printf '%s\n' "$*"; }
 die() { warn "$@"; exit 5; }
 warn() { printf '%s: %s\n' "${0##*/}" "$*" >&2; :; } # always return true
 varname_or_die() {
+    local H V
     H="${1:+$1: }"; shift
     for V in "$@"; do
         case "$V" in *[!A-Z0-9_]*|[0-9]*) die "${H}Bad variable name '$V'"; esac
     done
 }
 int_or_die() {
+    local H V
     H="${1:+$1: }"; shift
     for V in "$@"; do
         case "$V" in *[!0-9]*) die "${H}Bad integer '$V'"; esac
@@ -215,7 +217,8 @@ _trim_right() {
 # Usage: parse TOKENIZED
 #
 # Go through TOKENIZED and create finite-state machine rules suitable for
-# parsing a command line. Also checks nestedness of (...) and [...] constructs.
+# parsing a command line. Also checks the validity/nesting of (...) and [...]
+# constructs. (Failing if brackets or parentheses are unbalanced.)
 #
 # The following special characters are recognized:
 #   * Group start: '[' or '('
@@ -230,7 +233,6 @@ _trim_right() {
 # which 'entry' was taken.
 #
 # Internals:
-#
 #
 # LVL is the current level of nesting. GROUPS in the number of the current
 # parenthesis. In '()()' GROUPS is 1 and 2, and LVL 0 and 1. In '(())' GROUPS
@@ -249,16 +251,21 @@ _trim_right() {
 # whether it's a [...] or (...) group.
 #
 # FIXME: With [...] some leading and final rules will be needed twice: Implement!
-# FIXME: Stop using GROUP? (if possible)
 # FIXME: Export _DEBUG_RULES in some 'appropriate' way
 # FIXME: Implement finishing rules (instead of final states)
-# FIXME: Implement ellipsis! (there are a few test cases for this at the end)
+# FIXME: Stop using $IN and $GROUP? (if possible)
+
+# ELLIPSIS RULES
+# ==============
+# Ellipsis rules are extra rules built up during the processing of each group,
+# which are only inserted into the final ruleset if the group in question is
+# followed by '...'. They are the purple rules in the finite state machine
+# images, and they allow for repetition.
 parse() {
     local STARTAT=0                            # startat 'array' length
     local STATE=0 STATECOUNT=0
     local TYPE=''
-    local OUT='' END='' LF='
-'                                              # intentional newline
+    local OUT='' END=''
     _DEBUG_STATE=''                            # used in testing
     _DEBUG_GROUP=''
     _DEBUG_LEVEL=''
@@ -266,16 +273,15 @@ parse() {
     local LVL=0 GROUPS=0 IN=0 GROUP0=0 TYPE0=''
 
     # Loop over $@ while setting $A to current arg, and $NEXT to next arg.
-    local I=0 A='' NEXT='' ORGSTATE=''
+    local I=0 A='' NEXT='' PREV='' OLDSTATE='' ENDSTATE='' ELLIPSIS=''
     while I="$(( I + 1 ))"; [ "$I" -le "$#" ]; do
         eval    A="\"\$$I\""                   # current arg
         eval NEXT="\"\$$(( I + 1 ))\""         #   next arg
         append _DEBUG_STATE "$STATE $A"
         append _DEBUG_GROUP "$IN $A"
         append _DEBUG_LEVEL "$LVL $A"
-        ORGSTATE="$STATE"
         case "$A" in
-            ['(['])                           # start parenthesis or bracket
+            ['(['])                            # start parenthesis or bracket
                 _incvar LVL                    #   group level
                 _incvar GROUPS                 #   group number
                 IN="$GROUPS"                   #   current group number
@@ -284,43 +290,62 @@ parse() {
                     '(') local "TYPE$LVL"=')' ;;
                     '[') local "TYPE$LVL"=']' ;;
                 esac
-                local "BEG$IN"="$STATE"        #   array: group start state
                 _incvar STATECOUNT
-                local "END$IN"="$STATECOUNT"   #   array: group end state
+                local "BEG$IN"="$STATE"        #   set group start state
+                local "END$IN"="$STATECOUNT"   #   set group end state
+                local "ELLIPSIS$IN"=""         #   clear ellipsis rules
                 ;;
-            ['])'])                           # end bracket
+            '|')                               # pipe
+                _getvar STATE "BEG$IN"         #   return to group start state
+                ;;
+            ['])'])                            # end bracket
                 _getvar TYPE "TYPE$LVL"
                 [ "$LVL" -le 0    ] && warn "Too many '$A' in rule: $*" && return 1
                 [ "$A" != "$TYPE" ] && warn "Missing '$A' in rule (group $IN): $*" && return 1
 
                 #getvar STATE "END$IN"          #     return state to start bracket
 
+                # Apply ellipsis rules if followed by '...'.
+                if [ "$NEXT" = '...' ]; then
+                    _getvar ELLIPSIS "ELLIPSIS$IN"
+                    lfappend "_DEBUG_RULES" "$ELLIPSIS"
+                fi
+
                 unset "GROUP$LVL" "TYPE$LVL"   #   remove from group stack
                 _decvar LVL                    #   go down one level
                 _getvar IN "GROUP$LVL"         #   current group number
+                # FIXME: These lines not covered by test cases!! (necessary?)
                 case "$NEXT" in [')]'])
                     local "END$IN"="$STATE"
                 esac
-
                 ;;
-            '|')                               #   pipe
-                _getvar STATE "BEG$IN"         #     return state to start bracket
+            '...')                             # ellipsis
+                # '...' are handled at the end of the ')' / ']' state, and
+                # therefore just ignored here.
+                ## FIXME: Syntax check: may only come after WORD, ']' or ')'
+                ## FIXME: Test cases for
+                ##     A ... B
+                ##     A B ...
+                ##     ( A B ) ...
+                ##     ( A ) ( B ) ...
+                ##     ( A ( B ) ) ...         # should rules 'move' here?
+                ##     ( A ( B ( C ) ) ) ...   # should rules 'move' here?
+                ##     ( ( A ) B ) ...
                 ;;
-            '...')
-                ;;
-            *)                                 #   anything else
-                case "$NEXT" in
-                    ['|)]'])
-                        _getvar STATE "END$IN"
-                        ;;
-                    *)
-                        _incvar STATECOUNT
-                        STATE="$STATECOUNT"
-                        ;;
+            *)                                 # anything else
+                OLDSTATE="$STATE"
+                _getvar ENDSTATE "END$IN"
+                case "$NEXT" in                #   last in bracket group
+                    ['|)]'])                   #     use last state of bracket
+                        STATE="$ENDSTATE" ;;
+                    *)                         #   otherwise
+                        _incvar STATECOUNT     #     increase state by one
+                        STATE="$STATECOUNT" ;;
                 esac
-                lfappend _DEBUG_RULES "$ORGSTATE:$A -> $STATE"
-                #push RULE "$ORGSTATE:$A -> $STATE"
-                #RULE="${RULE:+$LF}$ORGSTATE:$A -> $STATE"
+                lfappend _DEBUG_RULES "$OLDSTATE:$A -> $STATE"
+                case "$PREV" in ['[(|'])       # add ellipsis rule
+                    lfappend "ELLIPSIS$IN" "$ENDSTATE:$A -> $STATE"
+                esac
                 ;;
         esac
         # # DEBUG: Indented parse output
@@ -338,6 +363,7 @@ parse() {
         # out "$DEBUG_INDENT>>$A"
         # out "  ${DEBUG_INDENT}LVL:$LVL STATE:$STATE"
         # DEBUG_INDENT="$DEBUG_INDENT_NEXT"
+        PREV="$A"
     done
     unset "GROUP0"  # last element of group stack
     unset "TYPE0"
@@ -350,55 +376,6 @@ parse() {
         return 1
     fi
 }
-
-################################################################################
-##                                                                            ##
-##  Test "Framework"                                                          ##
-##                                                                            ##
-################################################################################
-
-# Usage: printfmultiline FORMAT1 FORMAT2 STUFF
-printfml() {
-    local FMT="$1" FMT2="$2" X; shift 2
-    local LINE IFS='
-';  set -- $@                                  # intentionally unquoted
-    out '----------------------------------------'
-    for LINE in "$@"; do
-        printf "$FMT\n" "$LINE"
-        FMT="$FMT2"
-    done
-}
-
-FAILED_TESTS=0
-TESTS_COUNT=0
-# FIXME: Arg order SHOULD BE: GOT EXPECTED [MESSAGE] (from perl's Tests::More)
-# FIXME: Also fix arg order in all invokations
-test() {
-    local MSG="$1" EXPECTED="$2" GOT="$3" EXTRA="$4"
-    TESTS_COUNT="$(( TESTS_COUNT + 1 ))"
-    if [ "$GOT" != "$EXPECTED" ]; then
-        out "Test failed!!!"
-        out "    $MSG"
-        [ "$EXTRA" ] && out "    EXTRA   :  $EXTRA"
-        printfml '    EXPECTED: %s' '              %s' "$EXPECTED"
-        printfml '     BUT GOT: %s' '              %s' "$GOT"
-        incvar FAILED_TESTS
-    fi
-}
-
-tests_done() {
-    TESTS_DONE=1
-    if [ "$FAILED_TESTS" -gt 0 ]; then
-        printf '==============================================\n'
-        printf '== %-40s ==\n' 'ERRORS!!!!!!!!!!!!11111!!!'
-        printf '== %-40s ==\n' "$FAILED_TESTS tests failed!"
-        printf '==============================================\n'
-        exit 10
-    else
-        printf "All %s tests passed.\n" "$TESTS_COUNT"
-    fi
-}
-
 
 ################################################################################
 ##                                                                            ##
@@ -454,6 +431,7 @@ tests_done() {
 ##
 
 ok_varname() {
+    local H V
     H="${1:+$1: }"; shift
     for V in "$@"; do
         case "$V" in
@@ -466,6 +444,7 @@ ok_varname() {
 }
 
 ok_int() {
+    local H V
     H="${1:+$1: }"; shift
     for V in "$@"; do
         case "$V" in
@@ -540,11 +519,10 @@ dump() {
 
 ################################################################################
 ##                                                                            ##
-##  Tests                                                                     ##
+##  Test "Framework"                                                          ##
 ##                                                                            ##
 ################################################################################
 
-############################################################
 TESTS_DONE=''
 TMPDIR="$(mktemp -dt zdocpt2-XXXXXX)"
 TMPNUM="0"
@@ -554,10 +532,80 @@ trap "trap - EXIT INT
      [ \"\$TESTS_DONE\" ] || out '***PREMATURE EXIT! Not all tests ran!';
      exit" EXIT INT
 
-# Usage: inctmp VARNAME
+# Usage: tmpfile VARNAME
 #
 # Sets variable VARNAME to next suitable tempfile.
-inctmp() { setvar "$1" "$TMPDIR/$TMPNUM"; incvar TMPNUM; }
+tmpfile() { setvar "$1" "$TMPDIR/$TMPNUM"; incvar TMPNUM; }
+
+# Usage: printfmultiline FORMAT1 FORMAT2 STUFF
+printfml() {
+    local FMT="$1" FMT2="$2" X; shift 2
+    local LINE IFS='
+';  set -- $@                                  # intentionally unquoted
+    out '----------------------------------------'
+    for LINE in "$@"; do
+        printf "$FMT\n" "$LINE"
+        FMT="$FMT2"
+    done
+}
+
+FAILED_TESTS=0
+TESTS_COUNT=0
+# FIXME: Arg order SHOULD BE: GOT EXPECTED [MESSAGE] (from perl's Tests::More)
+# FIXME: Also fix arg order in all invokations
+test() {
+    local MSG="$1" EXPECTED="$2" GOT="$3" EXTRA="$4"
+    TESTS_COUNT="$(( TESTS_COUNT + 1 ))"
+    if [ "$GOT" != "$EXPECTED" ]; then
+        out "Test failed!!!"
+        out "    $MSG"
+        [ "$EXTRA" ] && out "    EXTRA   :  $EXTRA"
+        local FILE1='' FILE2=''; tmpfile FILE1; tmpfile FILE2
+        { out 'EXPECTED'; out "$EXPECTED"; } >"$FILE1"
+        { out 'GOT';      out "$GOT";      } >"$FILE2"
+        local WIDTH="$(( $(wc -L <"$FILE1") + $(wc -L <"$FILE2") + 8 ))"
+        [ "$WIDTH" -gt "$COLUMNS" ] && WIDTH="$COLUMNS"
+        diff --width="$WIDTH" --color=always --expand-tabs \
+             --side-by-side "$FILE1" "$FILE2" | \
+            while IFS='' read -r LINE; do echo "    $LINE\e[m"; done
+        out '----------------------------------------'
+        #printfml '    EXPECTED: %s' '              %s' "$EXPECTED"
+        #printfml '     BUT GOT: %s' '              %s' "$GOT"
+        incvar FAILED_TESTS
+    fi
+}
+
+tests_done() {
+    TESTS_DONE=1
+    if [ "$FAILED_TESTS" -gt 0 ]; then
+        printf '==============================================\n'
+        printf '== %-40s ==\n' 'ERRORS!!!!!!!!!!!!11111!!!'
+        printf '== %-40s ==\n' "$FAILED_TESTS tests failed!"
+        printf '==============================================\n'
+        exit 10
+    else
+        printf "All %s tests passed.\n" "$TESTS_COUNT"
+    fi
+}
+
+# Usage: dumpenv VARNAME...
+#
+# Outputs all environment variables to standard output (usin `set`) except
+# those specified on the command line. All named variables are locally unset
+# before outputting the variables but restored upon exiting the function.
+dumpenv() {
+    for VAR in "$@"; do
+        local "$VAR"
+        unset "$VAR"
+    done
+    set
+}
+
+################################################################################
+##                                                                            ##
+##  Tests                                                                     ##
+##                                                                            ##
+################################################################################
 
 ######################################################################
 ##
@@ -565,7 +613,7 @@ inctmp() { setvar "$1" "$TMPDIR/$TMPNUM"; incvar TMPNUM; }
 ##
 
 # get: Bad 1st arg, ARRAY is a number instead of ARRAY name
-inctmp TMPFILE
+tmpfile TMPFILE
 ARRAY="original"
 get 666 0 ARRAY 2>"$TMPFILE"; RETVAL="$?"
 read ERRMSG <"$TMPFILE"
@@ -574,7 +622,7 @@ test 'Error message'      "$BIN: get: Bad variable name '666'" "$ERRMSG"
 test 'Variable unchanged' "$ARRAY"                             "original"
 
 # get: Bad 1st arg, ARRAY with malformed length
-inctmp TMPFILE
+tmpfile TMPFILE
 ARRAY_=-1                                      # malformed 'array' (bad length)
 VARNAME=42
 get ARRAY 3 VARNAME 2>"$TMPFILE"; RETVAL="$?"
@@ -584,7 +632,7 @@ test 'Error message'      "$BIN: get (array length): Bad integer '-1'" "$ERRMSG"
 test 'Variable unchanged' "$VARNAME"                    "42"
 
 # get: Bad 2nd arg, INDEX is invalid integer
-inctmp TMPFILE
+tmpfile TMPFILE
 ARRAY="original"          # (a non-array)
 VARNAME=42
 get ARRAY -1 VARNAME 2>"$TMPFILE"; RETVAL="$?"
@@ -595,7 +643,7 @@ test 'Variable unchanged' "$ARRAY"                      "original"
 test 'Variable unchanged' "$VARNAME"                    "42"
 
 # get: Bad 2nd arg, INDEX out of range
-inctmp TMPFILE
+tmpfile TMPFILE
 ARRAY_=3; ARRAY_0="a"; ARRAY_1="b"; ARRAY_2="c"            # a real 'array'
 VARNAME=42
 get ARRAY 3 VARNAME 2>"$TMPFILE"; RETVAL="$?"
@@ -605,7 +653,7 @@ test 'Error message'      "$BIN: get: Index '3' too large (max is '2')" "$ERRMSG
 test 'Variable unchanged' "$VARNAME"                    "42"
 
 # get: Bad 3rd arg, VARNAME is a number instead of variable name
-inctmp TMPFILE
+tmpfile TMPFILE
 ARRAY="original"          # (a non-array)
 VARNAME=42
 get ARRAY 0 666 2>"$TMPFILE"; RETVAL="$?"
@@ -616,7 +664,7 @@ test 'Variable unchanged' "$ARRAY"                      "original"
 test 'Variable unchanged' "$VARNAME"                    "42"
 
 # get: Good args
-inctmp TMPFILE
+tmpfile TMPFILE
 ARRAY_=3; ARRAY_0="a"; ARRAY_1="b"; ARRAY_2="c"            # a real 'array'
 VARNAME=42
 get ARRAY 2 VARNAME 2>"$TMPFILE"; RETVAL="$?"
@@ -674,7 +722,7 @@ test '$X_0'          ''      "$X_0"
 test '$X_1'          ''      "$X_1"
 test 'leaking $_?'   "$ORG_" "$_"
 
-inctmp TMPFILE
+tmpfile TMPFILE
 pop X VALUE 2>"$TMPFILE"; RETVAL="$?"          # intentionally unquoted
 read ERRMSG <"$TMPFILE"
 test 'Return value'  "1" "$RETVAL"
@@ -687,7 +735,7 @@ test 'Error message' "$BIN: pop: Array 'X' is empty" "$ERRMSG"
 
 ## One ')' too many
 INPUT='A )'
-inctmp TMPFILE
+tmpfile TMPFILE
 parse $INPUT 2>"$TMPFILE"; RETVAL="$?"         # intentionally unquoted
 read ERRMSG <"$TMPFILE"
 test 'Return value'  "1" "$RETVAL"
@@ -695,7 +743,7 @@ test 'Error message' "$BIN: Too many ')' in rule: A )" "$ERRMSG"
 
 ## One ']' too many
 INPUT='A ]'
-inctmp TMPFILE
+tmpfile TMPFILE
 parse $INPUT 2>"$TMPFILE"; RETVAL="$?"         # intentionally unquoted
 read ERRMSG <"$TMPFILE"
 test 'Return value'  "1" "$RETVAL"
@@ -703,7 +751,7 @@ test 'Error message' "$BIN: Too many ']' in rule: A ]" "$ERRMSG"
 
 ## Missing ')'
 INPUT='[ A )'
-inctmp TMPFILE
+tmpfile TMPFILE
 parse $INPUT 2>"$TMPFILE"; RETVAL="$?"         # intentionally unquoted
 read ERRMSG <"$TMPFILE"
 test 'Return value'  "1" "$RETVAL"
@@ -711,7 +759,7 @@ test 'Error message' "$BIN: Missing ')' in rule (group 1): [ A )" "$ERRMSG"
 
 ## Missing ']'
 INPUT='( A ]'
-inctmp TMPFILE
+tmpfile TMPFILE
 parse $INPUT 2>"$TMPFILE"; RETVAL="$?"
 read ERRMSG <"$TMPFILE"
 test 'Return value'  "1" "$RETVAL"
@@ -719,7 +767,7 @@ test 'Error message' "$BIN: Missing ']' in rule (group 1): ( A ]" "$ERRMSG"
 
 ## Missing ']'
 INPUT='( A'
-inctmp TMPFILE
+tmpfile TMPFILE
 parse $INPUT 2>"$TMPFILE"; RETVAL="$?"
 read ERRMSG <"$TMPFILE"
 test 'Return value'  "1" "$RETVAL"
@@ -846,7 +894,7 @@ INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   X'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
 STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 X 8'
-## FIXME: These rules should account for the [...]
+## FIXME: These rules should also account for the [...]
 RULES='0:A -> 2
 2:B -> 3
 3:C -> 1
@@ -868,8 +916,10 @@ INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...  X'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
 STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 ... 1 X 8'
-## FIXME: These rules should account for the [...] and '...'
-RULES='0:A -> 2
+## FIXME: These rules should also account for the [...]
+## Ellipsis is corresponds to rules: '1:A -> 2', '1:D -> 4' and '1:G -> 6'.
+unset X                                        # ugly in-string coments
+RULES="0:A -> 2
 2:B -> 3
 3:C -> 1
 0:D -> 4
@@ -878,7 +928,10 @@ RULES='0:A -> 2
 0:G -> 6
 6:H -> 7
 7:I -> 1
-1:X -> 8'
+1:A -> 2${X:+                                  # ellipsis rule}
+1:D -> 4${X:+                                  # ellipsis rule}
+1:G -> 6${X:+                                  # ellipsis rule}
+1:X -> 8"
 parse $INPUT; RETVAL="$?"                      # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
@@ -954,7 +1007,7 @@ INPUT='  [   A   ]'
 LEVEL='0 [ 1 A 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0'
 STATE='0 [ 0 A 1 ] 1'; FINAL="0 1"
-## FIXME: These rules should account for the [...]
+## FIXME: These rules should also account for the [...]
 RULES='0:A -> 1'
 parse $INPUT; RETVAL="$?"                      # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
@@ -1031,7 +1084,8 @@ INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   ...'
 LEVEL='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 ... 0'
 STATE='0 ( 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ) 1 ... 1'; FINAL=1
-RULES='0:A -> 2
+unset X                                        # ugly in-string coments
+RULES="0:A -> 2
 2:B -> 3
 3:C -> 1
 0:D -> 4
@@ -1039,12 +1093,11 @@ RULES='0:A -> 2
 5:F -> 1
 0:G -> 6
 6:H -> 7
-7:I -> 1'
-#1:A -> 2                                      # FIXME: group repeat
-#1:D -> 4                                      # FIXME: group repeat
-#1:G -> 6                                      # FIXME: group repeat
+7:I -> 1
+1:A -> 2${X:+                                  # ellipsis rule}
+1:D -> 4${X:+                                  # ellipsis rule}
+1:G -> 6${X:+                                  # ellipsis rule}"
 #1: -> X'                                      # FIXME: eol (or next grouping)
-# FIXME: Implement '...' to produce the (above) group repeats
 # FIXME: Code should produce the (above) finishing state
 parse $INPUT; RETVAL="$?"                      # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
@@ -1057,7 +1110,8 @@ INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ] ...'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0'
 STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 ... 1'; FINAL="0 1"
-RULES='0:A -> 2
+unset X                                        # ugly in-string coments
+RULES="0:A -> 2
 2:B -> 3
 3:C -> 1
 0:D -> 4
@@ -1065,20 +1119,27 @@ RULES='0:A -> 2
 5:F -> 1
 0:G -> 6
 6:H -> 7
-7:I -> 1'
-#1:A -> 2                                      # FIXME: group repeat
-#1:D -> 4                                      # FIXME: group repeat
-#1:G -> 6                                      # FIXME: group repeat
+7:I -> 1
+1:A -> 2${X:+                                  # ellipsis rule}
+1:D -> 4${X:+                                  # ellipsis rule}
+1:G -> 6${X:+                                  # ellipsis rule}"
 #1: -> X                                       # FIXME: eol (or next grouping)
 #0: -> X'                                      # FIXME: eol (or next grouping)
 # FIXME: Implement '...' to produce the (above) group repeats
 # FIXME: Code should produce the (above) finishing state
+BEGENV="$(dumpenv \
+    _DEBUG_RULES _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
+    BEGENV ENDENV TESTS_COUNT)" # expect
 parse $INPUT; RETVAL="$?"                      # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
 test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+ENDENV="$(dumpenv \
+    _DEBUG_RULES _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
+    BEGENV ENDENV TESTS_COUNT)" # got
+test 'Variable leakage' "$BEGENV" "$ENDENV"      "$INPUT"
 
 #out "$RULES" >EXPECTED
 #out "$_DEBUG_RULES" >GOTTEN
