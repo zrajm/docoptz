@@ -224,7 +224,7 @@ _trim_right() {
 #   * Group start: '[' or '('
 #   * Group end: ']' or ')'
 #   * Subgroup separator: '|'
-#   * Repeat: '...'
+#   * Group repeat: '...'
 #
 # The beginning of a subgroup can be attached to one or more states (if the
 # previous subgroup[s] where optional). The first part of each subgroup is
@@ -293,7 +293,7 @@ parse() {
                 _incvar STATECOUNT
                 local "BEG$IN"="$STATE"        #   set group start state
                 local "END$IN"="$STATECOUNT"   #   set group end state
-                local "ELLIPSIS$IN"=""         #   clear ellipsis rules
+                #local "ELLIPSIS$IN"=""         #   clear ellipsis rules
                 ;;
             '|')                               # pipe
                 _getvar STATE "BEG$IN"         #   return to group start state
@@ -323,14 +323,6 @@ parse() {
                 # '...' are handled at the end of the ')' / ']' state, and
                 # therefore just ignored here.
                 ## FIXME: Syntax check: may only come after WORD, ']' or ')'
-                ## FIXME: Test cases for
-                ##     A ... B
-                ##     A B ...
-                ##     ( A B ) ...
-                ##     ( A ) ( B ) ...
-                ##     ( A ( B ) ) ...         # should rules 'move' here?
-                ##     ( A ( B ( C ) ) ) ...   # should rules 'move' here?
-                ##     ( ( A ) B ) ...
                 ;;
             *)                                 # anything else
                 OLDSTATE="$STATE"
@@ -345,6 +337,7 @@ parse() {
                 lfappend _DEBUG_RULES "$OLDSTATE:$A -> $STATE"
                 case "$PREV" in ['[(|'])       # add ellipsis rule
                     lfappend "ELLIPSIS$IN" "$ENDSTATE:$A -> $STATE"
+                    echo "ELLIPSIS$IN" "$ENDSTATE:$A -> $STATE"
                 esac
                 ;;
         esac
@@ -607,6 +600,24 @@ dumpenv() {
 ##                                                                            ##
 ################################################################################
 
+# FIXME: Since state '1' was eaten here, the last rule output
+# FIXME: when we have a case of multiple endings ) )... we must update END$IN for those groups
+# FIXME: Implement rules here
+INPUT='  (   (   A   )   B   )   ...'
+LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
+GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
+STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1 ... 1'; FINAL=1
+RULES='0:A -> 2
+2:B -> 1
+1:A -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+exit
 ######################################################################
 ##
 ##  Test get()
@@ -1029,11 +1040,138 @@ test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
 test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
 
-############################################################
+INPUT='  A ... B'
+LEVEL='0 A 0 ... 0 B 0'
+GROUP='0 A 0 ... 0 B 0'
+STATE='0 A 1 ... 1 B 2'; FINAL=2
+RULES='0:A -> 1
+1:B -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+## FIXME: NAKED ELLIPSIS (without preceeding parenthesis group)
+# INPUT='  A   ...   B'
+# LEVEL='0 A 0 ... 0 B 0'
+# GROUP='0 A 0 ... 0 B 0'
+# STATE='0 A 1 ... 1 B 2'; FINAL=2
+# RULES='0:A -> 1
+# 1:B -> 2
+# 1:A -> 1'
+# parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+# test 'Return value'     "0"      "$RETVAL"
+# test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+# test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+# test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+# test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+INPUT='  (   A   ) ... B'
+LEVEL='0 ( 1 A 1 ) 0 ... 0 B 0'
+GROUP='0 ( 1 A 1 ) 0 ... 0 B 0'
+STATE='0 ( 0 A 1 ) 1 ... 1 B 2'; FINAL=2
+RULES='0:A -> 1
+1:A -> 1
+1:B -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+INPUT='  (   A   B   )   ...'
+LEVEL='0 ( 1 A 1 B 1 ) 0 ... 0'
+GROUP='0 ( 1 A 1 B 1 ) 0 ... 0'
+STATE='0 ( 0 A 2 B 1 ) 1 ... 1'; FINAL=2
+RULES='0:A -> 2
+2:B -> 1
+1:A -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+INPUT='  (   A   )   (   B   )   ...'
+LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0 ... 0'
+GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0 ... 0'
+STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2 ... 2'; FINAL=2
+RULES='0:A -> 1
+1:B -> 2
+2:B -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+# FIXME: Since state '1' was eaten here, the last rule output
+# FIXME: When we have a case of multiple endings ) )... we must update END$IN for those groups
+# FIXME: Implement rules here
+INPUT='  (   A   (   B   )   )   ...'
+LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0 ... 0'
+GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0 ... 0'
+STATE='0 ( 0 A 2 ( 2 B 3 ) 3 ) 3 ... 3'; FINAL=3
+RULES='0:A -> 2
+2:B -> 3
+3:A -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+#test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+# FIXME: Since state '1' was eaten here, the last rule output
+# FIXME: when we have a case of multiple endings ) )... we must update END$IN for those groups
+# FIXME: Implement rules here
+INPUT='  (   A   (   B   (   C   )   )   )   ...'
+LEVEL='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0 ... 0'
+GROUP='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0 ... 0'
+STATE='0 ( 0 A 2 ( 2 B 4 ( 4 C 5 ) 5 ) 5 ) 5 ... 5'; FINAL=5
+# RULES='0:A -> 2
+# 2:B -> 3
+# 3:A -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+# test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+# FIXME: Since state '1' was eaten here, the last rule output
+# FIXME: when we have a case of multiple endings ) )... we must update END$IN for those groups
+# FIXME: Implement rules here
+INPUT='  (   (   A   )   B   )   ...'
+LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
+GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
+STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1 ... 1'; FINAL=1
+RULES='0:A -> 2
+2:B -> 1
+1:A -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+## FIXME: Add test cases for
+##     A B ...
+##     ( ( A ) B ) ...
+
+
+
+
+######################################################################
 ##
 ##  Tests from Finite State Automaton Images
 ##
-############################################################
 
 INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )'
 LEVEL='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0'
@@ -1125,7 +1263,6 @@ RULES="0:A -> 2
 1:G -> 6${X:+                                  # ellipsis rule}"
 #1: -> X                                       # FIXME: eol (or next grouping)
 #0: -> X'                                      # FIXME: eol (or next grouping)
-# FIXME: Implement '...' to produce the (above) group repeats
 # FIXME: Code should produce the (above) finishing state
 BEGENV="$(dumpenv \
     _DEBUG_RULES _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
@@ -1140,9 +1277,6 @@ ENDENV="$(dumpenv \
     _DEBUG_RULES _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     BEGENV ENDENV TESTS_COUNT)" # got
 test 'Variable leakage' "$BEGENV" "$ENDENV"      "$INPUT"
-
-#out "$RULES" >EXPECTED
-#out "$_DEBUG_RULES" >GOTTEN
 
 tests_done
 exit
