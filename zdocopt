@@ -3,7 +3,6 @@
 #set -euv
 
 # FIXME: Remove dead code
-# FIXME: is pop/push etc used? If not move to different file.
 
 #DEBUG=1
 if [ "$DEBUG" ]; then
@@ -40,14 +39,14 @@ int_or_die() {
 getvar() { varname_or_die getvar "$1" "$2"; _getvar "$@"; }
 _getvar() { eval "$1=\"\$$2\""; }
 
-# Usage: getvar VARNAME1 VARNAME2
-#
-# Variable VARNAME1 is set to whatever variable VARNAME2 contains.
-getint() { varname_or_die getint "$1" "$2"; _getint "$@"; }
-_getint() {
-    eval "$1=\"\$$2\"";
-    int_or_die getint "$1";
-}
+# # Usage: getvar VARNAME1 VARNAME2
+# #
+# # Variable VARNAME1 is set to whatever variable VARNAME2 contains.
+# getint() { varname_or_die getint "$1" "$2"; _getint "$@"; }
+# _getint() {
+#     eval "$1=\"\$$2\"";
+#     int_or_die getint "$1";
+# }
 
 # Usage: append VARNAME STRING
 #
@@ -59,11 +58,11 @@ append() {
     eval "$1=\"\${$1:+\$$1 }\$2\""
 }
 
-# Usage: lfappend VARNAME STRING
+# Usage: appendnl VARNAME STRING
 #
 # Append STRING to VARNAME with a space inbetween (unless VARNAME is empty, in
 # which case no space is inserted in front of STRING).
-lfappend() {
+appendnl() {
     varname_or_die append "$1";
     # VARNAME="${VARNAME:+$VARNAME<NEWLINE>}$2"
     eval "$1=\"\${$1:+\$$1
@@ -79,13 +78,13 @@ _setvar() { eval "$1=\"\$2\""; }
 # Usage: incvar VARNAME
 #
 # Sets variable VARNAME to 0 if unset, otherwise increment VARNAME by one.
-incvar() { varname_or_die incvar "$1"; _incvar "$@"; }
+#incvar() { varname_or_die incvar "$1"; _incvar "$@"; }
 _incvar() { eval "$1=\"\$((\${$1:--1} + 1))\""; } #VAR="$((${VAR:--1} + 1))"
 
 # Usage: decvar VARNAME
 #
 # Sets variable VARNAME to 0 if unset, otherwise decrement VARNAME by one.
-decvar() { varname_or_die decvar "$1"; _decvar "$@"; }
+#decvar() { varname_or_die decvar "$1"; _decvar "$@"; }
 _decvar() { _setvar "$1" "$(($1 - 1))"; }
 
 # Usage: parse TOKENIZED
@@ -147,7 +146,7 @@ parse() {
     local LVL=0 GROUPS=0 IN=0 GROUP0=0 TYPE0=''
 
     # Loop over $@ while setting $A to current arg, and $NEXT to next arg.
-    local I=0 A='' NEXT='' PREV='' OLDSTATE='' ENDSTATE='' ELLIPSIS=''
+    local I=0 A='' NEXT='' PREV='' OLDSTATE='' ENDSTATE='' ELLIPSIS='' TMP=''
     while I="$(( I + 1 ))"; [ "$I" -le "$#" ]; do
         eval    A="\"\$$I\""                   # current arg
         eval NEXT="\"\$$(( I + 1 ))\""         #   next arg
@@ -177,12 +176,22 @@ parse() {
                 [ "$LVL" -le 0    ] && warn "Too many '$A' in rule: $*" && return 1
                 [ "$A" != "$TYPE" ] && warn "Missing '$A' in rule (group $IN): $*" && return 1
 
-                #getvar STATE "END$IN"          #     return state to start bracket
+                #_getvar STATE "END$IN"          #     return state to start bracket
 
                 # Apply ellipsis rules if followed by '...'.
                 if [ "$NEXT" = '...' ]; then
                     _getvar ELLIPSIS "ELLIPSIS$IN"
-                    lfappend "_DEBUG_RULES" "$ELLIPSIS"
+                    #appendnl "_DEBUG_RULES" "$STATE:$ELLIPSIS"
+                    #HEREHERE
+
+                    prefix TMP "$STATE:" "$ELLIPSIS"
+                    appendnl "_DEBUG_RULES" "$TMP"
+
+                    # ## PREFIX every row of ELLIPSIS with STATE instead of the following
+                    # out "$ELLIPSIS" | while IFS='' read -r LINE; do
+                    #     echo ">>>>>$STATE:$LINE"
+                    #     appendnl "_DEBUG_RULES" "$STATE:$LINE"
+                    # done
                 fi
 
                 unset "GROUP$LVL" "TYPE$LVL"   #   remove from group stack
@@ -208,10 +217,10 @@ parse() {
                         _incvar STATECOUNT     #     increase state by one
                         STATE="$STATECOUNT" ;;
                 esac
-                lfappend _DEBUG_RULES "$OLDSTATE:$A -> $STATE"
+                appendnl _DEBUG_RULES "$OLDSTATE:$A -> $STATE"
                 case "$PREV" in ['[(|'])       # add ellipsis rule
-                    lfappend "ELLIPSIS$IN" "$ENDSTATE:$A -> $STATE"
-                    echo "ELLIPSIS$IN" "$ENDSTATE:$A -> $STATE"
+                    local "ELLIPSIS$IN"
+                    appendnl "ELLIPSIS$IN" "$A -> $STATE"
                 esac
                 ;;
         esac
@@ -238,64 +247,11 @@ parse() {
     append _DEBUG_GROUP "$IN"
     append _DEBUG_LEVEL "$LVL"
     if [ "$LVL" -ne 0 ]; then
-        local PAREN; getvar PAREN "TYPE$LVL"
+        local PAREN; _getvar PAREN "TYPE$LVL"
         warn "Missing '$PAREN' at end of rule: $*"
         return 1
     fi
 }
-
-################################################################################
-##                                                                            ##
-##  'Array' stuff                                                             ##
-##                                                                            ##
-################################################################################
-
-## Some pseudo-array idioms for dash:
-##
-## Init: Create length counter (nothing more):
-##
-##     local NAME="0"
-##
-## Push: Put content into variable named NAME# (where # is the number of the
-## element added) then increment length counter by one.
-##
-##     local "NAME$NAME"="SOMETHING"; $NAME="$(( NAME + 1))"
-##
-## Pop: First decrement length counter then get and unset the last element.
-##
-##     NAME="$(( NAME - 1 ))"; eval "VALUE=\"\$NAME$NAME\""; unset "NAME$NAME"
-##
-## Change value:
-##
-##     local "NAME$NAME"="NEW VALUE"
-##
-## Loop over:
-##
-##     local I=-1
-##     while I="$(( I + 1 ))"; [ "$I" -lt "$NAME" ]; do
-##         eval "VALUE=\"\$NAME$I\""
-##         # do stuff here
-##     done
-##
-## Go through and empty a stack (backwards order).
-##
-##     while [ "$NAME" -gt 0 ]; do
-##         NAME="$(( NAME - 1 ))"; eval "VALUE=\"\$NAME$NAME\""; unset "NAME$NAME"
-##         echo "NAME:$NAME"
-##         echo "$VALUE"
-##     done
-##
-## Go through and empty a stack from first to last item (array will be invalid
-## during traversal but in valid state after loop is done).
-##
-##     local I=-1
-##     while I="$(( I + 1 ))"; [ "$I" -lt "$NAME" ]; do
-##         eval "VALUE=\"\$NAME$I\""; unset "NAME$I"
-##         echo "NAME:$NAME"
-##         echo "$VALUE"
-##     done
-##     NAME=0
-##
 
 ok_varname() {
     local H V
@@ -323,65 +279,19 @@ ok_int() {
     return 0
 }
 
-# Usage: length ARRAYNAME VARNAME
-length() {
-    ok_varname length "$@" || return 1         # verify ARRAYNAME & VARNAME
-    eval "local _=\${$1_:-0}"                  # get length
-    ok_int length "$_" || return 1             # verify length
-    eval "$2=\"\$_\""
-    return 0
-}
-
-# Usage: get ARRAYNAME INDEX VARNAME
+# Usage: VARNAME PREFIX STRING
 #
-# Set variable VARNAME to element INDEX of ARRAYNAME.
-get() {
-    ok_varname get "$1" "$3" || return 1       # verify ARRAYNAME & VARNAME
-    ok_int     get "$2"      || return 1       # verify INDEX
-    eval "local _=\${$1_:-0}"                  # get length
-    ok_int 'get (array length)' "$_" || return 1 # verify length
-    [ "$2" -ge "$_" ] && warn "get: Index '$2' too large (max is '$((_ - 1))')" && return 1
-    eval "$3=\"\$$1_$2\""
-}
-
-# Usage: push ARRAYNAME VALUE
-#
-# Pushes VALUE onto pseudo-array 'ARRAYNAME'. If called inside a function you
-# should also invoke `local "ARRAYNAME$ARRAYNAME"`, before calling this.
-push() {
-    ok_varname push "$1" || return 1           # verify ARRAYNAME
-    eval "local _=\${$1_:-0}"                  # get length
-    ok_int push "$_" || return 1               # verify length
-    eval "${1}_$_=\"\$2\""                     # set array element
-    eval "${1}_=$(( $_ + 1 ))"                 # increase length
-    return 0
-}
-
-# Usage: pop ARRAYNAME VARNAME
-pop() {
-    ok_varname pop "$@" || return 1            # verify ARRAYNAME & VARNAME
-    eval "local _=\${$1_:-0}"                  # get length
-    ok_int pop "$_" || return 1                # verify length
-    if [ "$_" -le 0 ]; then
-        warn "pop: Array '$1' is empty"
-        return 1
-    fi
-    eval "_=$(( _ - 1 ))"                      # length - 1
-    eval "${1}_=\"\$_\""                       # decrease length
-    eval "$2=\"\$${1}_$_\""                    # get array element
-    unset "${1}_$_"                            # unset last element
-    return 0
-}
-
-# Usage: dump ARRAYNAME
-dump() {
-    ok_varname dump "$1" || return 1           # verify ARRAYNAME
-    length "$1" _LEN
-    local _I=-1 _VALUE=''
-    while _I="$(( _I + 1 ))"; [ "$_I" -lt "$_LEN" ]; do
-        get "$1" "$_I" _VALUE
-        out "$_VALUE"
+# Prefix every line in STRING with PREFIX, return in VARNAME.
+prefix() {
+    local _VAR="$1" _PRE="$2" _ARG='' IFS='
+'                                              # intentional newline
+    ok_varname prefix "$_VAR" || return 1      # verify VARNAME
+    set -- $3                                  # intentionally unquoted
+    for _ARG in "$@"; do
+        shift
+        set "$@" "$_PRE$_ARG"
     done
+    eval "$_VAR"="\$*"
 }
 
 ################################################################################
@@ -402,19 +312,19 @@ trap "trap - EXIT INT
 # Usage: tmpfile VARNAME
 #
 # Sets variable VARNAME to next suitable tempfile.
-tmpfile() { setvar "$1" "$TMPDIR/$TMPNUM"; incvar TMPNUM; }
+tmpfile() { setvar "$1" "$TMPDIR/$TMPNUM"; _incvar TMPNUM; }
 
-# Usage: printfmultiline FORMAT1 FORMAT2 STUFF
-printfml() {
-    local FMT="$1" FMT2="$2" X; shift 2
-    local LINE IFS='
-';  set -- $@                                  # intentionally unquoted
-    out '----------------------------------------'
-    for LINE in "$@"; do
-        printf "$FMT\n" "$LINE"
-        FMT="$FMT2"
-    done
-}
+# # Usage: printfmultiline FORMAT1 FORMAT2 STUFF
+# printfnl() {
+#     local FMT="$1" FMT2="$2" X; shift 2
+#     local LINE IFS='
+# ';  set -- $@                                  # intentionally unquoted
+#     out '----------------------------------------'
+#     for LINE in "$@"; do
+#         printf "$FMT\n" "$LINE"
+#         FMT="$FMT2"
+#     done
+# }
 
 FAILED_TESTS=0
 TESTS_COUNT=0
@@ -436,18 +346,18 @@ test() {
              --side-by-side "$FILE1" "$FILE2" | \
             while IFS='' read -r LINE; do echo "    $LINE\e[m"; done
         out '----------------------------------------'
-        #printfml '    EXPECTED: %s' '              %s' "$EXPECTED"
-        #printfml '     BUT GOT: %s' '              %s' "$GOT"
-        incvar FAILED_TESTS
+        #printfnl '    EXPECTED: %s' '              %s' "$EXPECTED"
+        #printfnl '     BUT GOT: %s' '              %s' "$GOT"
+        FAILED_TESTS="$(( FAILED_TESTS + 1 ))"
     fi
 }
 
-tests_done() {
+done_testing() {
     TESTS_DONE=1
     if [ "$FAILED_TESTS" -gt 0 ]; then
         printf '==============================================\n'
         printf '== %-40s ==\n' 'ERRORS!!!!!!!!!!!!11111!!!'
-        printf '== %-40s ==\n' "$FAILED_TESTS tests failed!"
+        printf '== %-40s ==\n' "$FAILED_TESTS (of $TESTS_COUNT) tests failed!"
         printf '==============================================\n'
         exit 10
     else
@@ -473,145 +383,6 @@ dumpenv() {
 ##  Tests                                                                     ##
 ##                                                                            ##
 ################################################################################
-
-# FIXME: Since state '1' was eaten here, the last rule output
-# FIXME: when we have a case of multiple endings ) )... we must update END$IN for those groups
-# FIXME: Implement rules here
-INPUT='  (   (   A   )   B   )   ...'
-LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
-GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
-STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1 ... 1'; FINAL=1
-RULES='0:A -> 2
-2:B -> 1
-1:A -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test 'Return value'     "0"      "$RETVAL"
-test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
-test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
-test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
-test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
-
-exit
-######################################################################
-##
-##  Test get()
-##
-
-# get: Bad 1st arg, ARRAY is a number instead of ARRAY name
-tmpfile TMPFILE
-ARRAY="original"
-get 666 0 ARRAY 2>"$TMPFILE"; RETVAL="$?"
-read ERRMSG <"$TMPFILE"
-test 'Return value'       "1"                                  "$RETVAL"
-test 'Error message'      "$BIN: get: Bad variable name '666'" "$ERRMSG"
-test 'Variable unchanged' "$ARRAY"                             "original"
-
-# get: Bad 1st arg, ARRAY with malformed length
-tmpfile TMPFILE
-ARRAY_=-1                                      # malformed 'array' (bad length)
-VARNAME=42
-get ARRAY 3 VARNAME 2>"$TMPFILE"; RETVAL="$?"
-read ERRMSG <"$TMPFILE"
-test 'Return value'       "1"                           "$RETVAL"
-test 'Error message'      "$BIN: get (array length): Bad integer '-1'" "$ERRMSG"
-test 'Variable unchanged' "$VARNAME"                    "42"
-
-# get: Bad 2nd arg, INDEX is invalid integer
-tmpfile TMPFILE
-ARRAY="original"          # (a non-array)
-VARNAME=42
-get ARRAY -1 VARNAME 2>"$TMPFILE"; RETVAL="$?"
-read ERRMSG <"$TMPFILE"
-test 'Return value'       "1"                           "$RETVAL"
-test 'Error message'      "$BIN: get: Bad integer '-1'" "$ERRMSG"
-test 'Variable unchanged' "$ARRAY"                      "original"
-test 'Variable unchanged' "$VARNAME"                    "42"
-
-# get: Bad 2nd arg, INDEX out of range
-tmpfile TMPFILE
-ARRAY_=3; ARRAY_0="a"; ARRAY_1="b"; ARRAY_2="c"            # a real 'array'
-VARNAME=42
-get ARRAY 3 VARNAME 2>"$TMPFILE"; RETVAL="$?"
-read ERRMSG <"$TMPFILE"
-test 'Return value'       "1"                           "$RETVAL"
-test 'Error message'      "$BIN: get: Index '3' too large (max is '2')" "$ERRMSG"
-test 'Variable unchanged' "$VARNAME"                    "42"
-
-# get: Bad 3rd arg, VARNAME is a number instead of variable name
-tmpfile TMPFILE
-ARRAY="original"          # (a non-array)
-VARNAME=42
-get ARRAY 0 666 2>"$TMPFILE"; RETVAL="$?"
-read ERRMSG <"$TMPFILE"
-test 'Return value'       "1"                           "$RETVAL"
-test 'Error message'      "$BIN: get: Bad variable name '666'" "$ERRMSG"
-test 'Variable unchanged' "$ARRAY"                      "original"
-test 'Variable unchanged' "$VARNAME"                    "42"
-
-# get: Good args
-tmpfile TMPFILE
-ARRAY_=3; ARRAY_0="a"; ARRAY_1="b"; ARRAY_2="c"            # a real 'array'
-VARNAME=42
-get ARRAY 2 VARNAME 2>"$TMPFILE"; RETVAL="$?"
-read ERRMSG <"$TMPFILE"
-test 'Return value'       "0"                           "$RETVAL"
-test 'Variable changed'   "$VARNAME"                    "c"
-
-######################################################################
-##
-##  Test push(), get(), length() and pop()
-##  FIXME: Break these apart and test them more thoroughly
-
-ORG_="$_"
-push X a
-length X LEN
-test 'Length'        '1'     "$LEN"
-test '$X_ (length)'  '1'     "$X_"
-test '$X_0'          'a'     "$X_0"
-test '$X_1'          ''      "$X_1"
-test 'leaking $_?'   "$ORG_" "$_"
-
-push X b
-length X LEN
-test 'Length'        '2'     "$LEN"
-test '$X_ (length)'  '2'     "$X_"
-test '$X_0'          'a'     "$X_0"
-test '$X_1'          'b'     "$X_1"
-test '$X_2'          ''      "$X_2"
-test 'leaking $_?'   "$ORG_" "$_"
-
-get X 0 VAL
-length X LEN
-test 'Length'        '2'     "$LEN"
-test '$X_ (length)'  '2'     "$X_"
-test '$X_0'          'a'     "$X_0"
-test '$X_1'          'b'     "$X_1"
-test '$X_2'          ''      "$X_2"
-test 'leaking $_?'   "$ORG_" "$_"
-
-pop X VALUE
-length X LEN
-test 'Gotted value'  'b'     "$VALUE"
-test 'Length'        '1'     "$LEN"
-test '$X_ (length)'  '1'     "$X_"
-test '$X_0'          'a'     "$X_0"
-test '$X_1'          ''      "$X_1"
-test 'leaking $_?'   "$ORG_" "$_"
-
-pop X VALUE
-length X LEN
-test 'Gotted value'  'a'     "$VALUE"
-test 'Length'        '0'     "$LEN"
-test '$X_ (length)'  '0'     "$X_"
-test '$X_0'          ''      "$X_0"
-test '$X_1'          ''      "$X_1"
-test 'leaking $_?'   "$ORG_" "$_"
-
-tmpfile TMPFILE
-pop X VALUE 2>"$TMPFILE"; RETVAL="$?"          # intentionally unquoted
-read ERRMSG <"$TMPFILE"
-test 'Return value'  "1" "$RETVAL"
-test 'Error message' "$BIN: pop: Array 'X' is empty" "$ERRMSG"
 
 ######################################################################
 ##
@@ -1008,15 +779,16 @@ INPUT='  (   A   (   B   (   C   )   )   )   ...'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0 ... 0'
 STATE='0 ( 0 A 2 ( 2 B 4 ( 4 C 5 ) 5 ) 5 ) 5 ... 5'; FINAL=5
-# RULES='0:A -> 2
-# 2:B -> 3
-# 3:A -> 2'
+RULES='0:A -> 2
+2:B -> 4
+4:C -> 5
+5:A -> 2'
 parse $INPUT; RETVAL="$?"                      # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
-# test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
 
 # FIXME: Since state '1' was eaten here, the last rule output
 # FIXME: when we have a case of multiple endings ) )... we must update END$IN for those groups
@@ -1036,11 +808,7 @@ test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
 test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
 
 ## FIXME: Add test cases for
-##     A B ...
 ##     ( ( A ) B ) ...
-
-
-
 
 ######################################################################
 ##
@@ -1140,7 +908,7 @@ RULES="0:A -> 2
 # FIXME: Code should produce the (above) finishing state
 BEGENV="$(dumpenv \
     _DEBUG_RULES _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
-    BEGENV ENDENV TESTS_COUNT)" # expect
+    BEGENV ENDENV TESTS_COUNT FAILED_TESTS TMPNUM)" # expect
 parse $INPUT; RETVAL="$?"                      # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
@@ -1149,10 +917,10 @@ test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
 test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
 ENDENV="$(dumpenv \
     _DEBUG_RULES _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
-    BEGENV ENDENV TESTS_COUNT)" # got
+    BEGENV ENDENV TESTS_COUNT FAILED_TESTS TMPNUM)" # got
 test 'Variable leakage' "$BEGENV" "$ENDENV"      "$INPUT"
 
-tests_done
+done_testing
 exit
 
 
