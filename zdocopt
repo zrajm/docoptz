@@ -331,7 +331,7 @@ TESTS_COUNT=0
 # FIXME: Arg order SHOULD BE: GOT EXPECTED [MESSAGE] (from perl's Tests::More)
 # FIXME: Also fix arg order in all invokations
 test() {
-    local MSG="$1" EXPECTED="$2" GOT="$3" EXTRA="$4"
+    local MSG="$1" GOT="$2" EXPECTED="$3" EXTRA="$4"
     TESTS_COUNT="$(( TESTS_COUNT + 1 ))"
     if [ "$GOT" != "$EXPECTED" ]; then
         out "Test failed!!!"
@@ -459,6 +459,33 @@ test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
 test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
 
+INPUT='  (   A   B   )'
+LEVEL='0 ( 1 A 1 B 1 ) 0'
+GROUP='0 ( 1 A 1 B 1 ) 0'
+STATE='0 ( 0 A 2 B 1 ) 1'; FINAL='2'
+RULES='0:A -> 2
+2:B -> 1'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+INPUT='  (   A   B   ) ...'
+LEVEL='0 ( 1 A 1 B 1 ) 0 ... 0'
+GROUP='0 ( 1 A 1 B 1 ) 0 ... 0'
+STATE='0 ( 0 A 2 B 1 ) 1 ... 1'; FINAL='2'
+RULES='0:A -> 2
+2:B -> 1
+1:A -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
 INPUT='  (   A   )   B'
 LEVEL='0 ( 1 A 1 ) 0 B 0'
 GROUP='0 ( 1 A 1 ) 0 B 0'
@@ -472,12 +499,96 @@ test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
 test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
 
+INPUT='  (   A   )   ...   B'
+LEVEL='0 ( 1 A 1 ) 0 ... 0 B 0'
+GROUP='0 ( 1 A 1 ) 0 ... 0 B 0'
+STATE='0 ( 0 A 1 ) 1 ... 1 B 2'; FINAL='2'
+RULES='0:A -> 1
+1:A -> 1
+1:B -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+INPUT='  A   (   B   )'
+LEVEL='0 A 0 ( 1 B 1 ) 0'
+GROUP='0 A 0 ( 1 B 1 ) 0'
+STATE='0 A 1 ( 1 B 2 ) 2'; FINAL='2'
+RULES='0:A -> 1
+1:B -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+INPUT='  A   (   B   ) ...'
+LEVEL='0 A 0 ( 1 B 1 ) 0 ... 0'
+GROUP='0 A 0 ( 1 B 1 ) 0 ... 0'
+STATE='0 A 1 ( 1 B 2 ) 2 ... 2'; FINAL='2'
+RULES='0:A -> 1
+1:B -> 2
+2:B -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
 INPUT='  (   A   )   (   B   )'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
 STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'; FINAL='2'
 RULES='0:A -> 1
 1:B -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+INPUT='  (   A   )   ...   (   B   )'
+LEVEL='0 ( 1 A 1 ) 0 ... 0 ( 1 B 1 ) 0'
+GROUP='0 ( 1 A 1 ) 0 ... 0 ( 2 B 2 ) 0'
+STATE='0 ( 0 A 1 ) 1 ... 1 ( 1 B 2 ) 2'; FINAL='2'
+RULES='0:A -> 1
+1:A -> 1
+1:B -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+INPUT='  (   A   )   (   B   )   ...'
+LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0 ... 0'
+GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0 ... 0'
+STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2 ... 2'; FINAL='2'
+RULES='0:A -> 1
+1:B -> 2
+2:B -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'State numbers'    "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
+INPUT='  (   A   )   ...   (   B   )   ...'
+LEVEL='0 ( 1 A 1 ) 0 ... 0 ( 1 B 1 ) 0 ... 0'
+GROUP='0 ( 1 A 1 ) 0 ... 0 ( 2 B 2 ) 0 ... 0'
+STATE='0 ( 0 A 1 ) 1 ... 1 ( 1 B 2 ) 2 ... 2'; FINAL='2'
+RULES='0:A -> 1
+1:A -> 1
+1:B -> 2
+2:B -> 2'
 parse $INPUT; RETVAL="$?"                      # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
@@ -607,51 +718,12 @@ test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
 test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
 
-INPUT='  (   A   )   (   B   )'
-LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
-GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
-STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'; FINAL="2"
-RULES='0:A -> 1
-1:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test 'Return value'     "0"      "$RETVAL"
-test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
-test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
-test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
-test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
-
-INPUT='  (   A   (   B   )   )'
-LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
-GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
-STATE='0 ( 0 A 2 ( 2 B 3 ) 3 ) 3'; FINAL="2"
-RULES='0:A -> 2
-2:B -> 3'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test 'Return value'     "0"      "$RETVAL"
-test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
-test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
-test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
-test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
-
 INPUT='  (   (   A   B   )   )'
 LEVEL='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
 GROUP='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
 STATE='0 ( 0 ( 0 A 3 B 2 ) 2 ) 2'; FINAL="2"
 RULES='0:A -> 3
 3:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test 'Return value'     "0"      "$RETVAL"
-test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
-test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
-test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
-test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
-
-INPUT='  (   (   A   )   B   )'
-LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
-GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
-STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1'; FINAL="2"
-RULES='0:A -> 2
-2:B -> 1'
 parse $INPUT; RETVAL="$?"                      # intentionally unquoted
 test 'Return value'     "0"      "$RETVAL"
 test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
@@ -741,6 +813,19 @@ test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
 test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
 
+INPUT='  (   A   )   (   B   )'
+LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
+GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
+STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'; FINAL="2"
+RULES='0:A -> 1
+1:B -> 2'
+parse $INPUT; RETVAL="$?"                      # intentionally unquoted
+test 'Return value'     "0"      "$RETVAL"
+test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
+test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
+test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
+test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
+
 INPUT='  (   A   )   (   B   )   ...'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0 ... 0'
@@ -806,9 +891,6 @@ test 'Bracket level'    "$LEVEL" "$_DEBUG_LEVEL" "$INPUT"
 test 'Group numbers'    "$GROUP" "$_DEBUG_GROUP" "$INPUT"
 test 'States'           "$STATE" "$_DEBUG_STATE" "$INPUT"
 test 'Rules'            "$RULES" "$_DEBUG_RULES" "$INPUT"
-
-## FIXME: Add test cases for
-##     ( ( A ) B ) ...
 
 ######################################################################
 ##
