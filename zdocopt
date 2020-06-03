@@ -1,5 +1,7 @@
 #!/bin/sh
 
+#set -euv
+
 # FIXME: Remove dead code
 # FIXME: is pop/push etc used? If not move to different file.
 
@@ -65,7 +67,7 @@ lfappend() {
     varname_or_die append "$1";
     # VARNAME="${VARNAME:+$VARNAME<NEWLINE>}$2"
     eval "$1=\"\${$1:+\$$1
-}\$2\""                                        # intentional linebreak
+}\$2\""                                        # intentional newline
 }
 
 # Usage: setvar VARNAME VALUE
@@ -85,134 +87,6 @@ _incvar() { eval "$1=\"\$((\${$1:--1} + 1))\""; } #VAR="$((${VAR:--1} + 1))"
 # Sets variable VARNAME to 0 if unset, otherwise decrement VARNAME by one.
 decvar() { varname_or_die decvar "$1"; _decvar "$@"; }
 _decvar() { _setvar "$1" "$(($1 - 1))"; }
-
-# Usage: VARNAME VALUE
-#
-# Set varible VARNAME to VALUE, except remove all trailing '.0' first.
-stripzeroes() {
-    #R="$STATE"
-    #while [ "$R" != "${R%.0}" ]; do R="${R%.0}"; done
-    eval "$1=\"\$2\";
-    while [ \"\$$1\" != \"\${$1%.0}\" ]; do $1=\"\${$1%.0}\"; done"
-}
-
-# Usage: increment_state STATE
-#
-# Where STATE is a number like '0' or '1.2' or '0.2.3'. Increments last digit
-# of state by one.
-increment_state() {
-    # case "$STATE" in
-    #     *.*) STATE="${STATE%.*}.$((${STATE##*.}+1))";;
-    #     *) STATE="$((STATE+1))"
-    # esac
-    varname_or_die increment_state "$1"
-    eval "case \"\$$1\" in
-        *.*) $1=\"\${$1%.*}.\$((\${$1##*.}+1))\";;
-        *) $1=\"\$(($1+1))\"
-    esac"
-}
-
-# Usage: LEVELVAR STATEVAR
-#
-# Goes one level deeper into hierarchy, by adding one to LEVELVAR and appending
-# a '.SUBSTATE' number to STATEVAR. SUBSTATE is guaranteed to be unique for
-# each LEVEL. (Uses forever incrementing variables ${LAST$LVL} to keep track of
-# which substates to use.)
-add_substate() {
-    varname_or_die add_substate "$1" "$2"
-    local _LVL
-    _incvar "$1"                      # increment level
-    _getvar _LVL "$1"                 #   get level value
-    int_or_die add_substate "$_LVL"
-    _incvar "LAST$_LVL"               # increment last substate
-    # STATE="$STATE.${LAST$_LVL}"
-    eval "$2=\"\$$2.\$LAST$_LVL\""    # append last substate to state
-}
-
-# remove_substate() {
-#     varname_or_die remove_substate "$2"
-#     # LVL="$((LVL-1))"
-#     #eval "$1=\"\$(($1-1))\""  # decrement LVL
-#     setvar "$1" "$(($1-1))"    # decrement LVL
-#     # STATE="${STATE%.*}"
-#     eval "$2=\"\${$2%.*}\""    # remove number from STATE
-# }
-
-# Usage: remove_level STATE LVL
-remove_level() {
-    # LVL="$((LVL-1))"
-    #eval "$1=\"\$(($1-1))\""  # decrement LVL
-    setvar "$1" "$(($1-1))"    # decrement LVL
-    # STATE="${STATE%.*}"
-    varname_or_die remove_level "$2"
-    eval "$2=\"\${$2%.*}\""    # remove number from STATE
-}
-
-output_rule() {
-    local STATE="$2" _RULE
-    getvar _RULE "$1"
-    [ "$_RULE" ] && printf "%s -> %s\n" "$_RULE" "$STATE"
-    unset "$1"
-}
-
-# Usage: push_state LVL STATEVAR
-#
-# Increment LVL by one, and add another substate onto STATEVAR. STATEVAR has
-# the syntax STATE[_SUBSTATE[_SUBSUBSTATE]], with '_' as separator between
-# states. STATE is guaranteed to be unique.
-#
-#### Goes one level deeper into hierarchy, by adding one to LEVELVAR and appending
-#### a '.SUBSTATE' number to STATEVAR. SUBSTATE is guaranteed to be unique for
-#### each LEVEL. (Uses forever incrementing variables ${LAST$LVL} to keep track of
-#### which substates to use.)
-push_state() {
-    varname_or_die push_state "$1" "$2"                                    ## from add_substate
-    local _LVL                                                             ## from add_substate
-    _incvar "$1"                      # increment level                    ## from add_substate
-    _getvar _LVL "$1"                 #   get level value                  ## from add_substate
-    int_or_die push_state "$_LVL"                                          ## from add_substate
-    _incvar "LAST$_LVL"               # increment last substate            ## from add_substate
-    # STATE="$STATE.${LAST$_LVL}"                                          ## from add_substate
-    #eval "$2=\"\$$2.\$LAST$_LVL\""    # append last substate to state      ## from add_substate
-    # STATE="${STATE}_${LAST$_LVL}"
-    eval "$2=\"\${$2}_\${LAST$_LVL}\""  # append last substate to state
-    # varname_or_die push_state "$@"
-    # local _LVL
-    # _incvar "$1"                      # increment level
-    # _getvar _LVL "$1"                 #   get level value
-    # _incvar "LAST$_LVL"               # increment last substate
-    # # STATE="$STATE.${LAST$_LVL}"
-    # eval "$2=\"\$${2}_\$LAST$_LVL\""    # append last substate to state
-}
-# Usage: pop_state LVL STATEVAR
-pop_state() {
-    varname_or_die pop_state "$@"
-    _decvar "$1"                # decrement LVL
-    eval "$2=\"\${$2%_*}\""     # remove number from STATE
-}
-# Usage: inc_state STATEVAR
-inc_state() {
-    varname_or_die inc_state "$1"
-    # case "$STATE" in
-    #     *.*) STATE="${STATE%.*}.$((${STATE##*.}+1))";;
-    #     *) STATE="$((STATE+1))"
-    # esac
-    eval "case \"\$$1\" in
-        *_*) $1=\"\${$1%_*}_\$((\${$1##*_}+1))\";;
-        *) $1=\"\$(($1+1))\"
-    esac"
-}
-# Usage: trim_right SUFFIX VARNAME
-#
-# Trims all trailing occurrences of SUFFIX off the string in the variable
-# VARNAME. If there are multiple occurrences of SUFFIX they are all trimmed
-# off. (This applies ${$VARNAME%$SUFFIX} until nothing more is trimmed off.)
-trim_right() { varname_or_die trim_right "$2"; _trim_right "$@"; }
-_trim_right() {
-    local _
-    # until _="$STR";STR="${STR%$SUFFIX}";[ "$STR" = "$_" ];do :;done
-    eval "until _=\"\$$2\";$2=\"\${$2%\$1}\";[ \"\$$2\" = \"\$_\" ];do :;done"
-}
 
 # Usage: parse TOKENIZED
 #
