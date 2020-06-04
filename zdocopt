@@ -180,8 +180,8 @@ parse() {
                     '[') local "TYPE$LVL"=']' ;;
                 esac
                 incvar STATECOUNT
-                local "BEG$IN"="$STATE"        #   set group start state
-                local "END$IN"="$STATECOUNT"   #   set group end state
+                local "BEG$LVL"="$STATE"        #   set group start state
+                local "END$LVL"="$STATECOUNT"   #   set group end state
                 #local "ELLIPSIS$IN"=""         #   clear ellipsis rules
                 ;;
             '|')                               # pipe
@@ -191,7 +191,7 @@ parse() {
                          '(Must be within parentheses/brackets.)'
                     return 1
                 fi
-                getvar STATE "BEG$IN"          #   return to group start state
+                getvar STATE "BEG$LVL"          #   return to group start state
                 ;;
             ['])'])                            # end bracket
                 local TYPE; getvar TYPE "TYPE$LVL"
@@ -199,7 +199,7 @@ parse() {
                 [ "$A" != "$TYPE" ] && warn "Missing '$A' in rule (group $IN): $*" && return 1
                 unset TYPE
 
-                #getvar STATE "END$IN"          #     return state to start bracket
+                #getvar STATE "END$LVL"          #     return state to start bracket
 
                 # Apply ellipsis rules if followed by '...'.
                 if [ "$NEXT" = '...' ]; then
@@ -213,7 +213,7 @@ parse() {
                 getvar IN "GROUP$LVL"          #   current group number
                 # FIXME: These lines not covered by test cases!! (necessary?)
                 case "$NEXT" in [')]'])
-                    local "END$IN"="$STATE"
+                    local "END$LVL"="$STATE"
                 esac
                 ;;
             '...')                             # ellipsis
@@ -230,7 +230,7 @@ parse() {
                 local PREVSTATE="$STATE" ENDSTATE=''
                 case "$NEXT" in                #   last in bracket group
                     ['|)]'])                   #     use last state of bracket
-                        getvar ENDSTATE "END$IN"
+                        getvar ENDSTATE "END$LVL"
                         STATE="$ENDSTATE" ;;
                     *)                         #   otherwise
                         incvar STATECOUNT      #     increase state by one
@@ -422,7 +422,7 @@ INPUT='  (   A   ...   |   B   )   ...'  # This does!
 
 
 # # FIXME: Since state '1' was eaten here, the last rule output
-# # FIXME: when we have a case of multiple endings ) )... we must update END$IN for those groups
+# # FIXME: when we have a case of multiple endings ) )... we must update END$LVL for those groups
 # # FIXME: Implement rules here
 # INPUT='  (   (   A   )   B   )   ...'
 # LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
@@ -925,7 +925,7 @@ test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 # FIXME: Since state '1' was eaten here, the last rule output
-# FIXME: When we have a case of multiple endings ) )... we must update END$IN for those groups
+# FIXME: When we have a case of multiple endings ) )... we must update END$LVL for those groups
 # FIXME: Implement rules here
 INPUT='  (   A   (   B   )   )   ...'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0 ... 0'
@@ -942,7 +942,7 @@ test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 # FIXME: Since state '1' was eaten here, the last rule output
-# FIXME: when we have a case of multiple endings ) )... we must update END$IN for those groups
+# FIXME: when we have a case of multiple endings ) )... we must update END$LVL for those groups
 # FIXME: Implement rules here
 INPUT='  (   A   (   B   (   C   )   )   )   ...'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0 ... 0'
@@ -960,7 +960,7 @@ test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 # FIXME: Since state '1' was eaten here, the last rule output
-# FIXME: when we have a case of multiple endings ) )... we must update END$IN for those groups
+# FIXME: when we have a case of multiple endings ) )... we must update END$LVL for those groups
 # FIXME: Implement rules here
 INPUT='  (   (   A   )   B   )   ...'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
