@@ -1,12 +1,27 @@
 #!/bin/sh
 
-#set -euv
+# -e -- errexit mode. Interrupt script if any command has exit code >0, unless
+# caught. The tests run with '&& :' which suppresses this for a single command,
+# while still catching the exit value in '$?'.
+set -e
 
-# FIXME: Use 'set -e'
+# set -euv
+
+# SOONER
+# ======
+# FIXME: Implement [...] some leading and final rules will be needed twice: Implement!
+# FIXME: Implement finishing rules (instead of final states)
+
+# LATER
+# =====
+# FIXME: Write tokenizer function
+# FIXME: Multiple passes of parse, building up a grammar?
+# FIXME: Allow 'xxx|yyy' (without parentheses)
+# FIXME: Stop using $IN and $GROUP? (if possible)
 # FIXME: Remove dead code
-# FIXME: Implement [...]
 
 #DEBUG=1
+DEBUG="${DEBUG:-}"
 if [ "$DEBUG" ]; then
     DEBUG() { {
         printf '%s\n' "$1"; shift
@@ -19,46 +34,19 @@ fi
 ################################################################################
 
 out() { printf '%s\n' "$*"; }
-die() { warn "$@"; exit 5; }
+#die() { warn "$@"; exit 5; }
 warn() {
-    printf '%s: %s\n%s\n' "${0##*/}" "$1" "$2" >&2;
+    [ "$1" ] && out "${0##*/}: $1" >&2
+    [ "$2" ] && out "$2" >&2
     return 0
 }
-varname_or_die() {
-    local H V
-    H="${1:+$1: }"; shift
-    for V in "$@"; do
-        case "$V" in *[!A-Z0-9_]*|[0-9]*) die "${H}Bad variable name '$V'"; esac
-    done
-}
-int_or_die() {
-    local H V
-    H="${1:+$1: }"; shift
-    for V in "$@"; do
-        case "$V" in *[!0-9]*) die "${H}Bad integer '$V'"; esac
-    done
-}
-# Usage: getvar VARNAME1 VARNAME2
-#
-# Variable VARNAME1 is set to whatever variable VARNAME2 contains.
-#getvar() { varname_or_die getvar "$1" "$2"; _getvar "$@"; }
-_getvar() { eval "$1=\"\$$2\""; }
-
-# # Usage: getvar VARNAME1 VARNAME2
-# #
-# # Variable VARNAME1 is set to whatever variable VARNAME2 contains.
-# getint() { varname_or_die getint "$1" "$2"; _getint "$@"; }
-# _getint() {
-#     eval "$1=\"\$$2\"";
-#     int_or_die getint "$1";
-# }
 
 # Usage: append VARNAME STRING
 #
 # Append STRING to VARNAME with a space inbetween (unless VARNAME is empty, in
 # which case no space is inserted in front of STRING).
 append() {
-    varname_or_die append "$1";
+    ok_varname "$1" append || return 1
     # VARNAME="${VARNAME:+$VARNAME }$2"
     eval "$1=\"\${$1:+\$$1 }\$2\""
 }
@@ -68,29 +56,31 @@ append() {
 # Append STRING to VARNAME with a space inbetween (unless VARNAME is empty, in
 # which case no space is inserted in front of STRING).
 appendnl() {
-    varname_or_die append "$1";
+    ok_varname "$1" appendnl || return 1
     # VARNAME="${VARNAME:+$VARNAME<NEWLINE>}$2"
     eval "$1=\"\${$1:+\$$1
 }\$2\""                                        # intentional newline
 }
 
+# Usage: getvar VARNAME1 VARNAME2
+#
+# Set VARNAME1 to whatever variable VARNAME2 contains.
+getvar() { eval "$1=\"\$$2\""; }
+
 # Usage: setvar VARNAME VALUE
 #
 # Set variable VARNAME to the specified value.
-setvar() { varname_or_die setvar "$1"; _setvar "$@"; }
-_setvar() { eval "$1=\"\$2\""; }
+setvar() { eval "$1=\"\$2\""; }
 
 # Usage: incvar VARNAME
 #
 # Sets variable VARNAME to 0 if unset, otherwise increment VARNAME by one.
-#incvar() { varname_or_die incvar "$1"; _incvar "$@"; }
-_incvar() { eval "$1=\"\$((\${$1:--1} + 1))\""; } #VAR="$((${VAR:--1} + 1))"
+incvar() { eval "$1=\"\$((\${$1:--1} + 1))\""; } #VAR="$((${VAR:--1} + 1))"
 
 # Usage: decvar VARNAME
 #
 # Sets variable VARNAME to 0 if unset, otherwise decrement VARNAME by one.
-#decvar() { varname_or_die decvar "$1"; _decvar "$@"; }
-_decvar() { _setvar "$1" "$(($1 - 1))"; }
+decvar() { setvar "$1" "$(($1 - 1))"; }
 
 # Usage: match PATTERN STRING
 #
@@ -103,11 +93,15 @@ match() {
     return 1
 }
 
-# Usage: parse TOKENIZED
+# Usage: parse RULESVAR TOKENIZED
 #
 # Go through TOKENIZED and create finite-state machine rules suitable for
 # parsing a command line. Also checks the validity/nesting of (...) and [...]
 # constructs. (Failing if brackets or parentheses are unbalanced.)
+#
+# The generated rules will be saved in the specified RULESVAR. Each rule is
+# separated by an newline, and is of the format 'STATE:INPUT -> ENDSTATE', or
+# just 'ENDSTATE'.
 #
 # The following special characters are recognized:
 #   * Group start: '[' or '('
@@ -139,10 +133,6 @@ match() {
 # within brackets), all higher numbers are either ']' or ')' depending on
 # whether it's a [...] or (...) group.
 #
-# FIXME: With [...] some leading and final rules will be needed twice: Implement!
-# FIXME: Export _DEBUG_RULES in some 'appropriate' way
-# FIXME: Implement finishing rules (instead of final states)
-# FIXME: Stop using $IN and $GROUP? (if possible)
 
 # ELLIPSIS RULES
 # ==============
@@ -150,36 +140,46 @@ match() {
 # which are only inserted into the final ruleset if the group in question is
 # followed by '...'. They are the purple rules in the finite state machine
 # images, and they allow for repetition.
+#
+# FINAL STATES
+# ============
+# Accumulate final states FINAL$IN. Whenever a new group is started on the same
+# level, and after the one which registered its final states, then the final
+# states should be removed, and instead a set of rules for transitioning from
+# the previously final state into the new group should be created. (And we
+# continue to accumulate new final state names.)
+#
+# Upon reaching the end of the input string, check to make sure were in one of
+# the final states.
 parse() {
-    local STARTAT=0                            # startat 'array' length
+    ok_varname "$1" parse || return 1
+    local _RULESVAR="$1"; shift
     local STATE=0 STATECOUNT=0
-    local TYPE=''
-    local OUT='' END=''
+    local _RULES='' _FINAL=''
     _DEBUG_STATE=''                            # used in testing
     _DEBUG_GROUP=''
     _DEBUG_LEVEL=''
-    _DEBUG_RULES=''
     local LVL=0 GROUPS=0 IN=0 GROUP0=0 TYPE0=''
 
     # Loop over $@ while setting $A to current arg, and $NEXT to next arg.
-    local I=0 A='' NEXT='' PREV='' OLDSTATE='' ENDSTATE='' ELLIPSIS='' NEWRULES=''
+    local I=0 A='' NEXT='' PREV=''
     while I="$(( I + 1 ))"; [ "$I" -le "$#" ]; do
         eval    A="\"\$$I\""                   # current arg
         eval NEXT="\"\$$(( I + 1 ))\""         #   next arg
-        append _DEBUG_STATE "$STATE $A"
-        append _DEBUG_GROUP "$IN $A"
-        append _DEBUG_LEVEL "$LVL $A"
+        append _DEBUG_STATE "$STATE $A" || return 1
+        append _DEBUG_GROUP "$IN $A"    || return 1
+        append _DEBUG_LEVEL "$LVL $A"   || return 1
         case "$A" in
             ['(['])                            # start parenthesis or bracket
-                _incvar LVL                    #   group level
-                _incvar GROUPS                 #   group number
+                incvar LVL                     #   group level
+                incvar GROUPS                  #   group number
                 IN="$GROUPS"                   #   current group number
                 local "GROUP$LVL"="$GROUPS"    #   loop stack: group number stack
                 case "$A" in                   #   loop stack: group types
                     '(') local "TYPE$LVL"=')' ;;
                     '[') local "TYPE$LVL"=']' ;;
                 esac
-                _incvar STATECOUNT
+                incvar STATECOUNT
                 local "BEG$IN"="$STATE"        #   set group start state
                 local "END$IN"="$STATECOUNT"   #   set group end state
                 #local "ELLIPSIS$IN"=""         #   clear ellipsis rules
@@ -191,25 +191,26 @@ parse() {
                          '(Must be within parentheses/brackets.)'
                     return 1
                 fi
-                _getvar STATE "BEG$IN"         #   return to group start state
+                getvar STATE "BEG$IN"          #   return to group start state
                 ;;
             ['])'])                            # end bracket
-                _getvar TYPE "TYPE$LVL"
+                local TYPE; getvar TYPE "TYPE$LVL"
                 [ "$LVL" -le 0    ] && warn "Too many '$A' in rule: $*" && return 1
                 [ "$A" != "$TYPE" ] && warn "Missing '$A' in rule (group $IN): $*" && return 1
+                unset TYPE
 
-                #_getvar STATE "END$IN"          #     return state to start bracket
+                #getvar STATE "END$IN"          #     return state to start bracket
 
                 # Apply ellipsis rules if followed by '...'.
                 if [ "$NEXT" = '...' ]; then
-                    _getvar ELLIPSIS "ELLIPSIS$IN"
-                    prefix NEWRULES "$STATE:" "$ELLIPSIS"
-                    appendnl "_DEBUG_RULES" "$NEWRULES"
+                    local ELLIPSIS; getvar ELLIPSIS "ELLIPSIS$IN"
+                    local NEWRULES; prefix NEWRULES "$STATE:" "$ELLIPSIS"
+                    appendnl "_RULES" "$NEWRULES" || return 1
+                    unset ELLIPSIS NEWRULES
                 fi
-
                 unset "GROUP$LVL" "TYPE$LVL"   #   remove from group stack
-                _decvar LVL                    #   go down one level
-                _getvar IN "GROUP$LVL"         #   current group number
+                decvar LVL                     #   go down one level
+                getvar IN "GROUP$LVL"          #   current group number
                 # FIXME: These lines not covered by test cases!! (necessary?)
                 case "$NEXT" in [')]'])
                     local "END$IN"="$STATE"
@@ -226,78 +227,71 @@ parse() {
                 fi
                 ;;
             *)                                 # anything else
-                OLDSTATE="$STATE"
-                _getvar ENDSTATE "END$IN"
+                local PREVSTATE="$STATE" ENDSTATE=''
                 case "$NEXT" in                #   last in bracket group
                     ['|)]'])                   #     use last state of bracket
+                        getvar ENDSTATE "END$IN"
                         STATE="$ENDSTATE" ;;
                     *)                         #   otherwise
-                        _incvar STATECOUNT     #     increase state by one
+                        incvar STATECOUNT      #     increase state by one
                         STATE="$STATECOUNT" ;;
                 esac
-                appendnl _DEBUG_RULES "$OLDSTATE:$A -> $STATE"
+                appendnl _RULES "$PREVSTATE:$A -> $STATE" || return 1
                 # If followed by '...' add rule to self.
                 if [ "$NEXT" = '...' ]; then
-                    appendnl _DEBUG_RULES "$STATE:$A -> $STATE"
+                    appendnl _RULES "$STATE:$A -> $STATE" || return 1
                 fi
                 case "$PREV" in ['[(|'])       # add ellipsis rule
                     local "ELLIPSIS$IN"
-                    appendnl "ELLIPSIS$IN" "$A -> $STATE"
+                    appendnl "ELLIPSIS$IN" "$A -> $STATE" || return 1
+
+                    # # go backward, add rules to previous nested states
+                    # local _I="$LVL"
+                    
+                    # echo "LEVEL: $LVL"
                 esac
                 ;;
         esac
         # # DEBUG: Indented parse output
-        # local DEBUG_INDENT DEBUG_INDENT_NEXT
+        # local _DEBUG_INDENT _DEBUG_INDENT_NEXT
         # case "$A" in
         #     '('|'[')                           # start parenthesis or bracket
-        #         DEBUG_INDENT_NEXT="    $DEBUG_INDENT" ;;
+        #         _DEBUG_INDENT_NEXT="    $_DEBUG_INDENT" ;;
         #     ']'|')')                           # end bracket
-        #         DEBUG_INDENT="${DEBUG_INDENT#    }"
-        #         DEBUG_INDENT_NEXT="$DEBUG_INDENT" ;;
+        #         _DEBUG_INDENT="${_DEBUG_INDENT#    }"
+        #         _DEBUG_INDENT_NEXT="$_DEBUG_INDENT" ;;
         #     '|')                               #   pipe
-        #         DEBUG_INDENT_NEXT="$DEBUG_INDENT"
-        #         DEBUG_INDENT="${DEBUG_INDENT#  }" ;;
+        #         _DEBUG_INDENT_NEXT="$_DEBUG_INDENT"
+        #         _DEBUG_INDENT="${_DEBUG_INDENT#  }" ;;
         # esac
-        # out "$DEBUG_INDENT>>$A"
-        # out "  ${DEBUG_INDENT}LVL:$LVL STATE:$STATE"
-        # DEBUG_INDENT="$DEBUG_INDENT_NEXT"
+        # local TMP
+        # getvar TMP "ELLIPSIS$IN"
+        # out "${_DEBUG_INDENT}'$A'"
+        # out "${_DEBUG_INDENT}    ((ELLIPSIS$IN: $TMP))"
+        # #out "  ${_DEBUG_INDENT}LVL:$LVL STATE:$STATE"
+        # _DEBUG_INDENT="$_DEBUG_INDENT_NEXT"
         PREV="$A"
     done
     unset "GROUP0"  # last element of group stack
     unset "TYPE0"
-    append _DEBUG_STATE "$STATE"
-    append _DEBUG_GROUP "$IN"
-    append _DEBUG_LEVEL "$LVL"
+    append _DEBUG_STATE "$STATE" || return 1
+    append _DEBUG_GROUP "$IN"    || return 1
+    append _DEBUG_LEVEL "$LVL"   || return 1
+
     if [ "$LVL" -ne 0 ]; then
-        local PAREN; _getvar PAREN "TYPE$LVL"
+        local PAREN; getvar PAREN "TYPE$LVL"
         warn "Missing '$PAREN' at end of rule: $*"
         return 1
     fi
+    setvar "$_RULESVAR" "$_RULES"
 }
 
 ok_varname() {
     local H V
-    H="${1:+$1: }"; shift
-    for V in "$@"; do
-        case "$V" in
-            *[!A-Z0-9_]*|[0-9]*)
-                warn "${H}Bad variable name '$V'"
-                return 1
-        esac
-    done
-    return 0
-}
-
-ok_int() {
-    local H V
-    H="${1:+$1: }"; shift
-    for V in "$@"; do
-        case "$V" in
-            *[!0-9]*)
-                warn "${H}Bad integer '$V'"
-                return 1
-        esac
-    done
+    case "$1" in *[!A-Z0-9_]*|[0-9]*)
+        warn "${2:+$2: }Bad variable name '$1'"
+        return 1
+    esac
     return 0
 }
 
@@ -307,7 +301,7 @@ ok_int() {
 prefix() {
     local _VAR="$1" _PRE="$2" _ARG='' IFS='
 '                                              # intentional newline
-    ok_varname prefix "$_VAR" || return 1      # verify VARNAME
+    ok_varname "$_VAR" prefix || return 1      # verify VARNAME
     set -- $3                                  # intentionally unquoted
     for _ARG in "$@"; do
         shift
@@ -334,19 +328,11 @@ trap "trap - EXIT INT
 # Usage: tmpfile VARNAME
 #
 # Sets variable VARNAME to next suitable tempfile.
-tmpfile() { setvar "$1" "$TMPDIR/$TMPNUM"; _incvar TMPNUM; }
-
-# # Usage: printfmultiline FORMAT1 FORMAT2 STUFF
-# printfnl() {
-#     local FMT="$1" FMT2="$2" X; shift 2
-#     local LINE IFS='
-# ';  set -- $@                                  # intentionally unquoted
-#     out '----------------------------------------'
-#     for LINE in "$@"; do
-#         printf "$FMT\n" "$LINE"
-#         FMT="$FMT2"
-#     done
-# }
+tmpfile() {
+    ok_varname "$1" tmpfile || return 1
+    setvar "$1" "$TMPDIR/$TMPNUM"
+    incvar TMPNUM
+}
 
 FAILED_TESTS=0
 TESTS_COUNT=0
@@ -404,13 +390,7 @@ dumpenv() {
     set
 }
 
-################################################################################
-##                                                                            ##
-##  Tests                                                                     ##
-##                                                                            ##
-################################################################################
-
-# Usage: read_stdin VARNAME [<FILE]
+# Usage: readall VARNAME [<FILE]
 #
 # Reads all of standard input sets the variable VARNAME to whatever was read.
 # Each line read from standard input is separated by a newline, but no final
@@ -424,6 +404,43 @@ readall() {
     done
 }
 
+################################################################################
+##                                                                            ##
+##  Tests                                                                     ##
+##                                                                            ##
+################################################################################
+
+# FIXME: Add test cases for 
+INPUT='  (   (   A   )   ...   B   )'
+INPUT='  (   (   A   )   ...   B   )   ...'
+INPUT='  (   (   A   )   B   )   ...'
+INPUT='  (   (   (   A   )   B   )   C   )   ...'
+INPUT='  (   (   (   A   )   ...   B   )   C   )   ...'
+
+INPUT='  (   A   ...   )   ...'          # Does this make sense?
+INPUT='  (   A   ...   |   B   )   ...'  # This does!
+
+
+# # FIXME: Since state '1' was eaten here, the last rule output
+# # FIXME: when we have a case of multiple endings ) )... we must update END$IN for those groups
+# # FIXME: Implement rules here
+# INPUT='  (   (   A   )   B   )   ...'
+# LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
+# GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
+# STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1 ... 1'; FINAL=1
+# RULES='0:A -> 2
+# 2:B -> 1
+# 1:A -> 2'
+# parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+# test "$RETVAL"       '0'      'Return value'
+# test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+# test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+# test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+# test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+
+# done_testing
+# exit
+
 ######################################################################
 ##
 ##  Test parse() error messages
@@ -432,68 +449,68 @@ readall() {
 ## Badly placed '...' (at beginning)
 INPUT='...'
 tmpfile TMPFILE
-parse $INPUT 2>"$TMPFILE"; RETVAL="$?"         # intentionally unquoted
+parse GOTTED_RULES $INPUT 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL" "1" 'Return value'
+test "$RETVAL" '1'                                      'Return value'
 test "$ERRMSG" "$BIN: Badly placed '...' in rule: ...
 (Must come after ARGUMENT or end parenthesis/bracket.)" 'Error message'
 
 ## Badly placed '...' (after start parenthesis)
 INPUT='( ...'
 tmpfile TMPFILE
-parse $INPUT 2>"$TMPFILE"; RETVAL="$?"         # intentionally unquoted
+parse GOTTED_RULES $INPUT 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL" "1" 'Return value'
+test "$RETVAL" '1'                                      'Return value'
 test "$ERRMSG" "$BIN: Badly placed '...' in rule: ( ...
 (Must come after ARGUMENT or end parenthesis/bracket.)" 'Error message'
 
 ## Badly placed '|' (outside paren)
 INPUT='|'
 tmpfile TMPFILE
-parse $INPUT 2>"$TMPFILE"; RETVAL="$?"         # intentionally unquoted
+parse GOTTED_RULES $INPUT 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL" "1" 'Return value'
+test "$RETVAL" '1'                                     'Return value'
 test "$ERRMSG" "$BIN: Badly placed '|' in rule: |
-(Must be within parentheses/brackets.)"
+(Must be within parentheses/brackets.)"                'Error message'
 
 ## One ')' too many
 INPUT='A )'
 tmpfile TMPFILE
-parse $INPUT 2>"$TMPFILE"; RETVAL="$?"         # intentionally unquoted
-read ERRMSG <"$TMPFILE"
-test "$RETVAL" "1" 'Return value'
-test "$ERRMSG" "$BIN: Too many ')' in rule: A )" 'Error message'
+parse GOTTED_RULES $INPUT 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
+readall ERRMSG <"$TMPFILE"
+test "$RETVAL" '1'                                     'Return value'
+test "$ERRMSG" "$BIN: Too many ')' in rule: A )"       'Error message'
 
 ## One ']' too many
 INPUT='A ]'
 tmpfile TMPFILE
-parse $INPUT 2>"$TMPFILE"; RETVAL="$?"         # intentionally unquoted
-read ERRMSG <"$TMPFILE"
-test "$RETVAL" "1" 'Return value'
-test "$ERRMSG" "$BIN: Too many ']' in rule: A ]" 'Error message'
+parse GOTTED_RULES $INPUT 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
+readall ERRMSG <"$TMPFILE"
+test "$RETVAL" '1'                                     'Return value'
+test "$ERRMSG" "$BIN: Too many ']' in rule: A ]"       'Error message'
 
 ## Missing ')'
 INPUT='[ A )'
 tmpfile TMPFILE
-parse $INPUT 2>"$TMPFILE"; RETVAL="$?"         # intentionally unquoted
-read ERRMSG <"$TMPFILE"
-test "$RETVAL" "1" 'Return value'
+parse GOTTED_RULES $INPUT 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
+readall ERRMSG <"$TMPFILE"
+test "$RETVAL" '1'                                     'Return value'
 test "$ERRMSG" "$BIN: Missing ')' in rule (group 1): [ A )" 'Error message'
 
 ## Missing ']'
 INPUT='( A ]'
 tmpfile TMPFILE
-parse $INPUT 2>"$TMPFILE"; RETVAL="$?"
-read ERRMSG <"$TMPFILE"
-test "$RETVAL" "1" 'Return value'
+parse GOTTED_RULES $INPUT 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
+readall ERRMSG <"$TMPFILE"
+test "$RETVAL" '1'                                     'Return value'
 test "$ERRMSG" "$BIN: Missing ']' in rule (group 1): ( A ]" 'Error message'
 
 ## Missing ']'
 INPUT='( A'
 tmpfile TMPFILE
-parse $INPUT 2>"$TMPFILE"; RETVAL="$?"
-read ERRMSG <"$TMPFILE"
-test "$RETVAL" "1" 'Return value'
+parse GOTTED_RULES $INPUT 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
+readall ERRMSG <"$TMPFILE"
+test "$RETVAL" '1'                                     'Return value'
 test "$ERRMSG" "$BIN: Missing ')' at end of rule: ( A" 'Error message'
 
 ######################################################################
@@ -506,12 +523,12 @@ LEVEL='0 A 0'
 GROUP='0 A 0'
 STATE='0 A 1'; FINAL='1'
 RULES='0:A -> 1'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  A   B'
 LEVEL='0 A 0 B 0'
@@ -519,12 +536,12 @@ GROUP='0 A 0 B 0'
 STATE='0 A 1 B 2'; FINAL='2'
 RULES='0:A -> 1
 1:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   B   )'
 LEVEL='0 ( 1 A 1 B 1 ) 0'
@@ -532,12 +549,12 @@ GROUP='0 ( 1 A 1 B 1 ) 0'
 STATE='0 ( 0 A 2 B 1 ) 1'; FINAL='2'
 RULES='0:A -> 2
 2:B -> 1'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   B   ) ...'
 LEVEL='0 ( 1 A 1 B 1 ) 0 ... 0'
@@ -546,12 +563,12 @@ STATE='0 ( 0 A 2 B 1 ) 1 ... 1'; FINAL='2'
 RULES='0:A -> 2
 2:B -> 1
 1:A -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   )   B'
 LEVEL='0 ( 1 A 1 ) 0 B 0'
@@ -559,12 +576,12 @@ GROUP='0 ( 1 A 1 ) 0 B 0'
 STATE='0 ( 0 A 1 ) 1 B 2'; FINAL='2'
 RULES='0:A -> 1
 1:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   )   ...   B'
 LEVEL='0 ( 1 A 1 ) 0 ... 0 B 0'
@@ -573,12 +590,12 @@ STATE='0 ( 0 A 1 ) 1 ... 1 B 2'; FINAL='2'
 RULES='0:A -> 1
 1:A -> 1
 1:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  A   (   B   )'
 LEVEL='0 A 0 ( 1 B 1 ) 0'
@@ -586,12 +603,12 @@ GROUP='0 A 0 ( 1 B 1 ) 0'
 STATE='0 A 1 ( 1 B 2 ) 2'; FINAL='2'
 RULES='0:A -> 1
 1:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  A   (   B   ) ...'
 LEVEL='0 A 0 ( 1 B 1 ) 0 ... 0'
@@ -600,12 +617,12 @@ STATE='0 A 1 ( 1 B 2 ) 2 ... 2'; FINAL='2'
 RULES='0:A -> 1
 1:B -> 2
 2:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   )   (   B   )'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
@@ -613,12 +630,12 @@ GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
 STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'; FINAL='2'
 RULES='0:A -> 1
 1:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   )   ...   (   B   )'
 LEVEL='0 ( 1 A 1 ) 0 ... 0 ( 1 B 1 ) 0'
@@ -627,12 +644,12 @@ STATE='0 ( 0 A 1 ) 1 ... 1 ( 1 B 2 ) 2'; FINAL='2'
 RULES='0:A -> 1
 1:A -> 1
 1:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   )   (   B   )   ...'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0 ... 0'
@@ -641,12 +658,12 @@ STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2 ... 2'; FINAL='2'
 RULES='0:A -> 1
 1:B -> 2
 2:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   )   ...   (   B   )   ...'
 LEVEL='0 ( 1 A 1 ) 0 ... 0 ( 1 B 1 ) 0 ... 0'
@@ -656,12 +673,12 @@ RULES='0:A -> 1
 1:A -> 1
 1:B -> 2
 2:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   (   A   )   B   )'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
@@ -669,12 +686,12 @@ GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
 STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1'; FINAL='1'
 RULES='0:A -> 2
 2:B -> 1'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   (   B   )   )'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
@@ -682,12 +699,12 @@ GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
 STATE='0 ( 0 A 2 ( 2 B 3 ) 3 ) 3'; FINAL='3' # (state 1 never used)
 RULES='0:A -> 2
 2:B -> 3'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   (   B   (   C   )   )   )'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0'
@@ -696,12 +713,12 @@ STATE='0 ( 0 A 2 ( 2 B 4 ( 4 C 5 ) 5 ) 5 ) 5'; FINAL='3' # (state 1 & 3 never us
 RULES='0:A -> 2
 2:B -> 4
 4:C -> 5'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   X'
 LEVEL='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 X 0'
@@ -717,12 +734,12 @@ RULES='0:A -> 2
 6:H -> 7
 7:I -> 1
 1:X -> 8'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   X'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
@@ -739,19 +756,19 @@ RULES='0:A -> 2
 6:H -> 7
 7:I -> 1
 1:X -> 8'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...  X'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
 STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 ... 1 X 8'
 ## FIXME: These rules should also account for the [...]
-unset X                                        # ugly in-string coments
+unset X                                        # ugly in-string comments
 RULES="0:A -> 2
 2:B -> 3
 3:C -> 1
@@ -765,24 +782,24 @@ RULES="0:A -> 2
 1:D -> 4${X:+                                  # ellipsis rule }
 1:G -> 6${X:+                                  # ellipsis rule }
 1:X -> 8"
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   )'
 LEVEL='0 ( 1 A 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0'
-STATE='0 ( 0 A 1 ) 1'; FINAL="1"
+STATE='0 ( 0 A 1 ) 1'; FINAL='1'
 RULES='0:A -> 1'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   (   A   B   )   )'
 LEVEL='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
@@ -790,12 +807,12 @@ GROUP='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
 STATE='0 ( 0 ( 0 A 3 B 2 ) 2 ) 2'; FINAL="2"
 RULES='0:A -> 3
 3:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  [   A   ]'
 LEVEL='0 [ 1 A 1 ] 0'
@@ -803,12 +820,12 @@ GROUP='0 [ 1 A 1 ] 0'
 STATE='0 [ 0 A 1 ] 1'; FINAL="0 1"
 ## FIXME: These rules should also account for the [...]
 RULES='0:A -> 1'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   |   B   )'
 LEVEL='0 ( 1 A 1 | 1 B 1 ) 0'
@@ -816,12 +833,12 @@ GROUP='0 ( 1 A 1 | 1 B 1 ) 0'
 STATE='0 ( 0 A 1 | 0 B 1 ) 1'; FINAL=1
 RULES='0:A -> 1
 0:B -> 1'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   |   B   )   ...'
 LEVEL='0 ( 1 A 1 | 1 B 1 ) 0 ... 0'
@@ -831,12 +848,12 @@ RULES='0:A -> 1
 0:B -> 1
 1:A -> 1
 1:B -> 1'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  A   ...   B'
 LEVEL='0 A 0 ... 0 B 0'
@@ -845,12 +862,12 @@ STATE='0 A 1 ... 1 B 2'; FINAL=2
 RULES='0:A -> 1
 1:A -> 1
 1:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   ) ... B'
 LEVEL='0 ( 1 A 1 ) 0 ... 0 B 0'
@@ -859,12 +876,12 @@ STATE='0 ( 0 A 1 ) 1 ... 1 B 2'; FINAL=2
 RULES='0:A -> 1
 1:A -> 1
 1:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   B   )   ...'
 LEVEL='0 ( 1 A 1 B 1 ) 0 ... 0'
@@ -873,12 +890,12 @@ STATE='0 ( 0 A 2 B 1 ) 1 ... 1'; FINAL=2
 RULES='0:A -> 2
 2:B -> 1
 1:A -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   )   (   B   )'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
@@ -886,12 +903,12 @@ GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
 STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'; FINAL="2"
 RULES='0:A -> 1
 1:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   )   (   B   )   ...'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0 ... 0'
@@ -900,12 +917,12 @@ STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2 ... 2'; FINAL=2
 RULES='0:A -> 1
 1:B -> 2
 2:B -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 # FIXME: Since state '1' was eaten here, the last rule output
 # FIXME: When we have a case of multiple endings ) )... we must update END$IN for those groups
@@ -917,12 +934,12 @@ STATE='0 ( 0 A 2 ( 2 B 3 ) 3 ) 3 ... 3'; FINAL=3
 RULES='0:A -> 2
 2:B -> 3
 3:A -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 # FIXME: Since state '1' was eaten here, the last rule output
 # FIXME: when we have a case of multiple endings ) )... we must update END$IN for those groups
@@ -935,12 +952,12 @@ RULES='0:A -> 2
 2:B -> 4
 4:C -> 5
 5:A -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 # FIXME: Since state '1' was eaten here, the last rule output
 # FIXME: when we have a case of multiple endings ) )... we must update END$IN for those groups
@@ -952,12 +969,12 @@ STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1 ... 1'; FINAL=1
 RULES='0:A -> 2
 2:B -> 1
 1:A -> 2'
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-#test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+#test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 ######################################################################
 ##
@@ -979,12 +996,12 @@ RULES='0:A -> 2
 7:I -> 1'
 #1: -> X'                                      # FIXME: eol (or next grouping)
 # FIXME: Code should produce the (above) finishing state
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0'
@@ -1002,18 +1019,18 @@ RULES='0:A -> 2
 #1: -> X                                       # FIXME: eol (or next grouping)
 #0: -> X'                                      # FIXME: eol (or next grouping)
 # FIXME: Code should produce the (above) finishing states
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   ...'
 LEVEL='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 ... 0'
 STATE='0 ( 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ) 1 ... 1'; FINAL=1
-unset X                                        # ugly in-string coments
+unset X                                        # ugly in-string comments
 RULES="0:A -> 2
 2:B -> 3
 3:C -> 1
@@ -1028,18 +1045,18 @@ RULES="0:A -> 2
 1:G -> 6${X:+                                  # ellipsis rule }"
 #1: -> X'                                      # FIXME: eol (or next grouping)
 # FIXME: Code should produce the (above) finishing state
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ] ...'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0'
 STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 ... 1'; FINAL="0 1"
-unset X                                        # ugly in-string coments
+unset X                                        # ugly in-string comments
 RULES="0:A -> 2
 2:B -> 3
 3:C -> 1
@@ -1056,42 +1073,19 @@ RULES="0:A -> 2
 #0: -> X'                                      # FIXME: eol (or next grouping)
 # FIXME: Code should produce the (above) finishing state
 BEGENV="$(dumpenv \
-    _DEBUG_RULES _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
+    _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     BEGENV ENDENV TESTS_COUNT FAILED_TESTS TMPNUM)" # expect
-parse $INPUT; RETVAL="$?"                      # intentionally unquoted
-test "$RETVAL" "0" 'Return value'
+parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
 test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$_DEBUG_RULES" "$RULES"         "Rules: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 ENDENV="$(dumpenv \
-    _DEBUG_RULES _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
+    _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     BEGENV ENDENV TESTS_COUNT FAILED_TESTS TMPNUM)" # got
 test "$ENDENV" "$BEGENV"      "Variable leakage: '$INPUT'"
 
 done_testing
-exit
-
-
-    ARGS='  [ NAME ]'
-EXPECTED='0 [ 0 NAME 0 ] 0'
-out $ARGS           # intentionally unquoted
-parse $ARGS      # intentionally unquoted
-
-    ARGS='  (   (   A   (   B   |   C   [   D   ]   )   )   |   (   E   )   (   F   )   )'
-EXPECTED='0 ( 0 ( 0 A 1 ( 1 B 2 | 1 C 3 [ 3 D 3 ] 3 ) 3 ) 3 | 0 ( 0 E 4 ) 4 ( 4 F 5 ) 5 ) 5'
-#         0 ( 0 ( 0   1 ( 1   2 | 1   3 [ 3   3 ] 3 ) 3 ) 3 | 0 ( 0   4 ) 4 ( 4   5 ) 5 ) 5
-# LEVEL:    1   2   2   3   3   3   3   4   4   4   3   2   1   2   2   2   2   2   2   1
-# START:    0   0       1               3                       2       2   2       2   1
-
-# before '|' = set group endstate
-#   if type bracket = endstate = startstate
-#   if type paren   = endstate = next state
-
-
-out $ARGS        # intentionally unquoted
-parse $ARGS   # intentionally unquoted
-
-echo ">$BEG2<"
 
 #[eof]
