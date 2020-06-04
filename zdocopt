@@ -151,69 +151,74 @@ match() {
 #
 # Upon reaching the end of the input string, check to make sure were in one of
 # the final states.
+
+# STATE is the currently processed state, STATEMAX is the maxiumum state used
+# so far (for each state added STATEMAX is increased, so that it is the highest
+# STATE used so far).
 parse() {
     ok_varname "$1" parse || return 1
-    local _RULESVAR="$1"; shift
-    local STATE=0 STATECOUNT=0
-    local _RULES='' _FINAL=''
+    local _VAR="$1"; shift
     _DEBUG_STATE=''                            # used in testing
     _DEBUG_GROUP=''
     _DEBUG_LEVEL=''
-    local LVL=0 GROUPS=0 IN=0 GROUP0=0 TYPE0=''
-
+    local _STATE=0 _STATEMAX=0
+    local _RULES='' _FINAL=''
+    local _GRPMAX=0 IN=0 _LVL=0                # stack counter
+    local _BEG0=0 _END0=0 _GRP0=0 TYPE0=''     # loop stacks
     # Loop over $@ while setting $A to current arg, and $NEXT to next arg.
     local I=0 A='' NEXT='' PREV=''
     while I="$(( I + 1 ))"; [ "$I" -le "$#" ]; do
         eval    A="\"\$$I\""                   # current arg
         eval NEXT="\"\$$(( I + 1 ))\""         #   next arg
-        append _DEBUG_STATE "$STATE $A" || return 1
-        append _DEBUG_GROUP "$IN $A"    || return 1
-        append _DEBUG_LEVEL "$LVL $A"   || return 1
+        append _DEBUG_STATE "$_STATE $A" || return 1
+        append _DEBUG_GROUP "$IN $A"     || return 1
+        append _DEBUG_LEVEL "$_LVL $A"   || return 1
         case "$A" in
             ['(['])                            # start parenthesis or bracket
-                incvar LVL                     #   group level
-                incvar GROUPS                  #   group number
-                IN="$GROUPS"                   #   current group number
-                local "GROUP$LVL"="$GROUPS"    #   loop stack: group number stack
+                incvar _LVL                    #   group level
+                incvar _GRPMAX                 #   group number
+                IN="$_GRPMAX"                  #   current group number
+                incvar _STATEMAX
+                local "_BEG$_LVL"="$_STATE"    #   set group start state
+                local "_END$_LVL"="$_STATEMAX" #   set group end state
+                local "_GRP$_LVL"="$_GRPMAX"   #   loop stack: group number stack
                 case "$A" in                   #   loop stack: group types
-                    '(') local "TYPE$LVL"=')' ;;
-                    '[') local "TYPE$LVL"=']' ;;
+                    '(') local "TYPE$_LVL"=')' ;;
+                    '[') local "TYPE$_LVL"=']' ;;
                 esac
-                incvar STATECOUNT
-                local "BEG$LVL"="$STATE"        #   set group start state
-                local "END$LVL"="$STATECOUNT"   #   set group end state
                 #local "ELLIPSIS$IN"=""         #   clear ellipsis rules
                 ;;
             '|')                               # pipe
                 # FIXME: Should '||', '[|', '(|', '|]' and '|)' be allowed?
-                if [ "$LVL" -eq 0 ]; then
+                if [ "$_LVL" -eq 0 ]; then
                     warn "Badly placed '|' in rule: $*" \
                          '(Must be within parentheses/brackets.)'
                     return 1
                 fi
-                getvar STATE "BEG$LVL"          #   return to group start state
+                getvar _STATE "_BEG$_LVL"      #   return to group start state
                 ;;
             ['])'])                            # end bracket
-                local TYPE; getvar TYPE "TYPE$LVL"
-                [ "$LVL" -le 0    ] && warn "Too many '$A' in rule: $*" && return 1
+                local TYPE; getvar TYPE "TYPE$_LVL"
+                [ "$_LVL" -le 0    ] && warn "Too many '$A' in rule: $*" && return 1
                 [ "$A" != "$TYPE" ] && warn "Missing '$A' in rule (group $IN): $*" && return 1
                 unset TYPE
 
-                #getvar STATE "END$LVL"          #     return state to start bracket
+                #getvar _STATE "_END$_LVL"      #     return state to start bracket
 
                 # Apply ellipsis rules if followed by '...'.
                 if [ "$NEXT" = '...' ]; then
                     local ELLIPSIS; getvar ELLIPSIS "ELLIPSIS$IN"
-                    local NEWRULES; prefix NEWRULES "$STATE:" "$ELLIPSIS"
+                    local NEWRULES; prefix NEWRULES "$_STATE:" "$ELLIPSIS"
                     appendnl "_RULES" "$NEWRULES" || return 1
                     unset ELLIPSIS NEWRULES
                 fi
-                unset "GROUP$LVL" "TYPE$LVL"   #   remove from group stack
-                decvar LVL                     #   go down one level
-                getvar IN "GROUP$LVL"          #   current group number
+                # Pop off last element of 'stack's.
+                unset "_GRP$_LVL" "TYPE$_LVL" "_BEG$_LVL" "_END$_LVL"
+                decvar _LVL                    #   go down one level
+                getvar IN "_GRP$_LVL"          #   current group number
                 # FIXME: These lines not covered by test cases!! (necessary?)
                 case "$NEXT" in [')]'])
-                    local "END$LVL"="$STATE"
+                    local "_END$_LVL"="$_STATE"
                 esac
                 ;;
             '...')                             # ellipsis
@@ -227,28 +232,28 @@ parse() {
                 fi
                 ;;
             *)                                 # anything else
-                local PREVSTATE="$STATE" ENDSTATE=''
+                local PREVSTATE="$_STATE" ENDSTATE=''
                 case "$NEXT" in                #   last in bracket group
                     ['|)]'])                   #     use last state of bracket
-                        getvar ENDSTATE "END$LVL"
-                        STATE="$ENDSTATE" ;;
+                        getvar ENDSTATE "_END$_LVL"
+                        _STATE="$ENDSTATE" ;;
                     *)                         #   otherwise
-                        incvar STATECOUNT      #     increase state by one
-                        STATE="$STATECOUNT" ;;
+                        incvar _STATEMAX       #     increase state by one
+                        _STATE="$_STATEMAX" ;;
                 esac
-                appendnl _RULES "$PREVSTATE:$A -> $STATE" || return 1
+                appendnl _RULES "$PREVSTATE:$A -> $_STATE" || return 1
                 # If followed by '...' add rule to self.
                 if [ "$NEXT" = '...' ]; then
-                    appendnl _RULES "$STATE:$A -> $STATE" || return 1
+                    appendnl _RULES "$_STATE:$A -> $_STATE" || return 1
                 fi
                 case "$PREV" in ['[(|'])       # add ellipsis rule
                     local "ELLIPSIS$IN"
-                    appendnl "ELLIPSIS$IN" "$A -> $STATE" || return 1
+                    appendnl "ELLIPSIS$IN" "$A -> $_STATE" || return 1
 
                     # # go backward, add rules to previous nested states
-                    # local _I="$LVL"
+                    # local _I="$_LVL"
                     
-                    # echo "LEVEL: $LVL"
+                    # echo "LEVEL: $_LVL"
                 esac
                 ;;
         esac
@@ -268,22 +273,22 @@ parse() {
         # getvar TMP "ELLIPSIS$IN"
         # out "${_DEBUG_INDENT}'$A'"
         # out "${_DEBUG_INDENT}    ((ELLIPSIS$IN: $TMP))"
-        # #out "  ${_DEBUG_INDENT}LVL:$LVL STATE:$STATE"
+        # #out "  ${_DEBUG_INDENT}LVL:$_LVL STATE:$_STATE"
         # _DEBUG_INDENT="$_DEBUG_INDENT_NEXT"
         PREV="$A"
     done
-    unset "GROUP0"  # last element of group stack
+    unset "_GRP0"  # last element of group stack
     unset "TYPE0"
-    append _DEBUG_STATE "$STATE" || return 1
+    append _DEBUG_STATE "$_STATE" || return 1
     append _DEBUG_GROUP "$IN"    || return 1
-    append _DEBUG_LEVEL "$LVL"   || return 1
+    append _DEBUG_LEVEL "$_LVL"   || return 1
 
-    if [ "$LVL" -ne 0 ]; then
-        local PAREN; getvar PAREN "TYPE$LVL"
+    if [ "$_LVL" -ne 0 ]; then
+        local PAREN; getvar PAREN "TYPE$_LVL"
         warn "Missing '$PAREN' at end of rule: $*"
         return 1
     fi
-    setvar "$_RULESVAR" "$_RULES"
+    setvar "$_VAR" "$_RULES"
 }
 
 ok_varname() {
@@ -422,7 +427,7 @@ INPUT='  (   A   ...   |   B   )   ...'  # This does!
 
 
 # # FIXME: Since state '1' was eaten here, the last rule output
-# # FIXME: when we have a case of multiple endings ) )... we must update END$LVL for those groups
+# # FIXME: when we have a case of multiple endings ) )... we must update _END$_LVL for those groups
 # # FIXME: Implement rules here
 # INPUT='  (   (   A   )   B   )   ...'
 # LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
@@ -925,7 +930,7 @@ test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 # FIXME: Since state '1' was eaten here, the last rule output
-# FIXME: When we have a case of multiple endings ) )... we must update END$LVL for those groups
+# FIXME: When we have a case of multiple endings ) )... we must update _END$_LVL for those groups
 # FIXME: Implement rules here
 INPUT='  (   A   (   B   )   )   ...'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0 ... 0'
@@ -942,7 +947,7 @@ test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 # FIXME: Since state '1' was eaten here, the last rule output
-# FIXME: when we have a case of multiple endings ) )... we must update END$LVL for those groups
+# FIXME: when we have a case of multiple endings ) )... we must update _END$_LVL for those groups
 # FIXME: Implement rules here
 INPUT='  (   A   (   B   (   C   )   )   )   ...'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0 ... 0'
@@ -960,7 +965,7 @@ test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 
 # FIXME: Since state '1' was eaten here, the last rule output
-# FIXME: when we have a case of multiple endings ) )... we must update END$LVL for those groups
+# FIXME: when we have a case of multiple endings ) )... we must update _END$_LVL for those groups
 # FIXME: Implement rules here
 INPUT='  (   (   A   )   B   )   ...'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
