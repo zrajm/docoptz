@@ -1,5 +1,24 @@
 #!/bin/sh
 
+# func() {
+#     local _
+#     eval "$1"=''
+#     while IFS='' read -r _; do
+#         eval "$1"="\"\${$1:+\$$1
+# }\$_\""                                        # intentional newline
+#     done
+# }
+#
+# func hey <<EOF
+# xyz() {
+#     echo hej
+# }
+# xyz
+# EOF
+#
+# $hey souh a.scuheu s,carhu
+# exit
+
 # -e -- errexit mode. Interrupt script if any command has exit code >0, unless
 # caught. The tests run with '&& :' which suppresses this for a single command,
 # while still catching the exit value in '$?'.
@@ -233,15 +252,15 @@ replace() {
 # so far (for each state added STATEMAX is increased, so that it is the highest
 # STATE used so far).
 
-
-# Usage: parse RULESVAR TOKEN...
+# Usage: parse RULESVAR DOCSTR
 #
 # Go through TOKEN(s) and create finite-state machine rules suitable for
-# parsing a command line. Also checks the validity/nesting of (...) and [...]
-# constructs. (Failing if brackets or parentheses are unbalanced.)
+# parsing the command line specified by DOCSTR. Will fail (returning false)
+# DOCSTR is malformed, if everything went well, returns true and set the
+# RULESVAR variable to a (multiline) string with rules for a finite state
+# automaton, suitable for parsing a command line.
 parse() {
-    local _VAR="$1"; shift
-    local _INPUT="$*"; shift
+    local _VAR="$1" _INPUT="$2"
     ok_varname "$_VAR" parse || return 1
 
     # Tokenize by adding space round syntactic chars, then split into $@.
@@ -424,6 +443,7 @@ tmpfile() {
 
 FAILED_TESTS=0
 TESTS_COUNT=0
+TEST_OUT=''
 # Usage: test GOT EXPECTED [MESSAGE]
 #
 # Tests if GOT and EXPECTED is the same, return true if this is the case, false
@@ -433,28 +453,33 @@ test() {
     local GOT="$1" EXPECTED="$2" MSG="$3"
     TESTS_COUNT="$(( TESTS_COUNT + 1 ))"
     if [ "$GOT" != "$EXPECTED" ]; then
-        out "Test failed!!!"
-        out "    $MSG"
+        appendnl TEST_OUT "Test $TESTS_COUNT failed!!!"
+        appendnl TEST_OUT "    $MSG"
         local FILE1='' FILE2=''; tmpfile FILE1; tmpfile FILE2
-        { out 'EXPECTED:'; out "$EXPECTED"; } >"$FILE1"
-        { out 'GOT:';      out "$GOT";      } >"$FILE2"
+        { appendnl TEST_OUT 'EXPECTED:'; appendnl TEST_OUT "$EXPECTED"; } >"$FILE1"
+        { appendnl TEST_OUT 'GOT:';      appendnl TEST_OUT "$GOT";      } >"$FILE2"
         local WIDTH="$(( $(wc -L <"$FILE1") + $(wc -L <"$FILE2") + 8 ))"
         [ "$WIDTH" -gt "$COLUMNS" ] && WIDTH="$COLUMNS"
         diff --width="$WIDTH" --color=always --expand-tabs \
              --side-by-side "$FILE1" "$FILE2" | \
             while IFS='' read -r LINE; do echo "    $LINE\e[m"; done
-        out '----------------------------------------'
+        appendnl TEST_OUT '----------------------------------------'
         #printfnl '    EXPECTED: %s' '              %s' "$EXPECTED"
         #printfnl '     BUT GOT: %s' '              %s' "$GOT"
         FAILED_TESTS="$(( FAILED_TESTS + 1 ))"
-        return 1
+        printf 'F'
+        return
+        #return 1
     fi
-    return 0
+    printf '.'
+    #return 0
 }
 
 done_testing() {
     TESTS_DONE=1
+    printf '\n'
     if [ "$FAILED_TESTS" -ne 0 ]; then
+        printf '%s\n' "$TEST_OUT"
         printf '==============================================\n'
         printf '== %-40s ==\n' 'ERRORS!!!!!!!!!!!!11111!!!'
         printf '== %-40s ==\n' "$FAILED_TESTS (of $TESTS_COUNT) tests failed!"
