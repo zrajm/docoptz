@@ -34,12 +34,12 @@ fi
 ################################################################################
 
 out() { printf '%s\n' "$*"; }
-#die() { warn "$@"; exit 5; }
 warn() {
     [ "$1" ] && out "${0##*/}: $1" >&2
     [ "$2" ] && out "$2" >&2
     return 0
 }
+#die() { warn "$@"; exit 5; }
 
 ok_varname() {
     local H V
@@ -48,42 +48,6 @@ ok_varname() {
         return 1
     esac
     return 0
-}
-
-# Usage: VARNAME PREFIX STRING
-#
-# Prefix every line in STRING with PREFIX, return in VARNAME.
-prefix() {
-    local _VAR="$1" _PRE="$2" _ARG='' IFS='
-'                                              # intentional newline
-    ok_varname "$_VAR" prefix || return 1      # verify VARNAME
-    set -- $3                                  # intentionally unquoted
-    for _ARG in "$@"; do
-        shift
-        set "$@" "$_PRE$_ARG"
-    done
-    eval "$_VAR"="\$*"
-}
-
-# Usage: append VARNAME STRING
-#
-# Append STRING to VARNAME with a space inbetween (unless VARNAME is empty, in
-# which case no space is inserted in front of STRING).
-append() {
-    ok_varname "$1" append || return 1
-    # VARNAME="${VARNAME:+$VARNAME }$2"
-    eval "$1=\"\${$1:+\$$1 }\$2\""
-}
-
-# Usage: appendnl VARNAME STRING
-#
-# Append STRING to VARNAME with a space inbetween (unless VARNAME is empty, in
-# which case no space is inserted in front of STRING).
-appendnl() {
-    ok_varname "$1" appendnl || return 1
-    # VARNAME="${VARNAME:+$VARNAME<NEWLINE>}$2"
-    eval "$1=\"\${$1:+\$$1
-}\$2\""                                        # intentional newline
 }
 
 # Usage: getvar VARNAME1 VARNAME2
@@ -128,6 +92,78 @@ eqvar() {
     getvar A "$1"
     getvar B "$2"
     [ "$A" = "$B" ]
+}
+
+# Usage: VARNAME PREFIX STRING
+#
+# Prefix every line in STRING with PREFIX, return in VARNAME.
+prefix() {
+    local _VAR="$1" _PRE="$2" _ARG='' IFS='
+'                                              # intentional newline
+    ok_varname "$_VAR" prefix || return 1      # verify VARNAME
+    set -- $3                                  # intentionally unquoted
+    for _ARG in "$@"; do
+        shift
+        set "$@" "$_PRE$_ARG"
+    done
+    eval "$_VAR"="\$*"
+}
+
+# Usage: append VARNAME STRING
+#
+# Append STRING to VARNAME with a space inbetween (unless VARNAME is empty, in
+# which case no space is inserted in front of STRING).
+append() {
+    ok_varname "$1" append || return 1
+    # VARNAME="${VARNAME:+$VARNAME }$2"
+    eval "$1=\"\${$1:+\$$1 }\$2\""
+}
+
+# Usage: appendnl VARNAME STRING
+#
+# Append STRING to VARNAME with a space inbetween (unless VARNAME is empty, in
+# which case no space is inserted in front of STRING).
+appendnl() {
+    ok_varname "$1" appendnl || return 1
+    # VARNAME="${VARNAME:+$VARNAME<NEWLINE>}$2"
+    eval "$1=\"\${$1:+\$$1
+}\$2\""                                        # intentional newline
+}
+
+# Usage: join VARNAME SEP STR...
+#
+# Joins all STR together, using SEP as separator. The result is put into
+# variable VARNAME. Returns false if VARNAME did not contain a valid varname,
+# true otherwise. Be careful with what you put into SEP as it needs to be
+# quoted properly (simple strings, not containing " or } should be fine).
+join() {
+    local _SEP="$2"
+    ok_varname "$1" join || return 1
+    local _
+    # 'shift' inside eval strips off VARNAME, SEP & 1st element of list.
+    # VAR="$3"; shift 3; for _; do VAR="${VAR}$SEP$_"; done
+    eval "$1=\"\$3\"; shift 3; for _; do $1=\"\$$1\$_SEP\$_\"; done"
+}
+
+# Usage: replace VARNAME SUBSTR REPLACEMENT
+#
+# Replace all occurrences of SUBSTR in the variable VARNAME with REPLACEMENT.
+# Returns false if VARNAME is not a valid variable name, otherwise it will
+# always return true (regardless of whether SUBSTR could be found or not). If
+# SUBSTR couldn't be found VARNAME will remain unmodified.
+replace() {
+    [ "$#" -ne 3 ] && warn 'replace: Bad number of arguments' && return 1
+    local _VAR="$1" _SUBSTR="$2" _REPL="$3" _REMAIN _LAST; shift 3
+    ok_varname "$_VAR" replace || return 1     #
+    eval "set -- \"\$$_VAR\""                  # set $1
+    while
+        _REMAIN="${1%$_SUBSTR*}"               # get remainder
+        [ "$_REMAIN" != "$1" ]                 #   while subst is occurring
+    do
+        _LAST="${1#$_REMAIN$_SUBSTR}"; shift   # get last substring
+        set -- "$_REMAIN" "$_LAST" "$@"        #   put remainder + last substr
+    done                                       #     separately into $@
+    eval "join $_VAR \"$_REPL\" \"\$@\""  # join & put into $_VAR
 }
 
 # Usage: parse RULESVAR TOKENIZED
@@ -194,6 +230,13 @@ eqvar() {
 # STATE is the currently processed state, STATEMAX is the maxiumum state used
 # so far (for each state added STATEMAX is increased, so that it is the highest
 # STATE used so far).
+
+
+# Usage: parse RULESVAR TOKEN...
+#
+# Go through TOKEN(s) and create finite-state machine rules suitable for
+# parsing a command line. Also checks the validity/nesting of (...) and [...]
+# constructs. (Failing if brackets or parentheses are unbalanced.)
 parse() {
     ok_varname "$1" parse || return 1
     local _VAR="$1"; shift
@@ -442,6 +485,130 @@ readall() {
 ##                                                                            ##
 ################################################################################
 
+# ## Replace character at beginning and end
+# VALUE='[A|B]X'
+# echo "$VALUE"
+# replace VALUE ']' 'XX]' && :; RETVAL="$?"
+# test "$RETVAL"  '0'                                       'Return value'
+# test "$VALUE"   '[A|BXX]X'                                'Replacing ":" -> "|"'
+
+# echo ================================================================================
+# # HERE
+# INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   X'
+# LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
+# GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
+# STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 X 8'
+# ## FIXME: These rules should also account for the [...]
+# RULES='0:A -> 2
+# 2:B -> 3
+# 3:C -> 1
+# 0:D -> 4
+# 4:E -> 5
+# 5:F -> 1
+# 0:G -> 6
+# 6:H -> 7
+# 7:I -> 1
+# 1:X -> 8'
+# parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
+# test "$RETVAL"       '0'      'Return value'
+# test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+# test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+# test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+# test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+# exit
+
+
+#############################
+####  Test ok_varname()  ####
+#############################
+## Varname may not start with digit
+tmpfile TMPFILE
+ok_varname 0ABC 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+test "$RETVAL"  '1'                                     'Return value'
+test "$ERRMSG"  "$BIN: Bad variable name '0ABC'"        'Error message'
+
+## Varname may not contain lower case
+tmpfile TMPFILE
+ok_varname ABCx test 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+test "$RETVAL"  '1'                                     'Return value'
+test "$ERRMSG"  "$BIN: test: Bad variable name 'ABCx'"  'Error message'
+
+## Varname may start with/contain '_'
+ok_varname _ABC && :; RETVAL="$?"
+test "$RETVAL"  '0'                                     'Return value'
+
+#########################
+#####  Test join()  #####
+#########################
+tmpfile TMPFILE
+join abc '$' '' '' 1 2 '' 3 '' '' 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+test "$RETVAL"  '1'                                    'Return value'
+test "$ERRMSG"  "$BIN: join: Bad variable name 'abc'"  'Error message'
+
+join VAR '$' '' '' 1 2 '' 3 '' '' && :; RETVAL="$?"
+test "$RETVAL"  '0'           'Return value'
+test "$VAR"     '$$1$2$$3$$'  'Join with "$" as separator'
+
+join VAR "'" "" "" 1 2 "" 3 "" "" && :; RETVAL="$?"
+test "$RETVAL"  '0'           'Return value'
+test "$VAR"     "''1'2''3''"  'Join with "'\''" as separator'
+
+############################
+#####  Test replace()  #####
+############################
+## Call with too few arguments
+tmpfile TMPFILE
+(replace abc) 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+test "$RETVAL"  '1'                                       'Return value'
+test "$ERRMSG"  "$BIN: replace: Bad number of arguments"  'Error message'
+
+## Call with too many arguments
+tmpfile TMPFILE
+(replace 1 2 3 4) 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+test "$RETVAL"  '1'                                       'Return value'
+test "$ERRMSG"  "$BIN: replace: Bad number of arguments"  'Error message'
+
+## Call with invalid variable name (1st arg)
+tmpfile TMPFILE
+(replace abc : :) 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+test "$RETVAL"  '1'                                       'Return value'
+test "$ERRMSG"  "$BIN: replace: Bad variable name 'abc'"  'Error message'
+
+## Replace character at beginning and end
+VALUE=':A:B::'
+replace VALUE ':' '|' && :; RETVAL="$?"
+test "$RETVAL"  '0'                                       'Return value'
+test "$VALUE"   '|A|B||'                                  'Replacing ":" -> "|"'
+
+## Replace multi character substring
+VALUE='<>A<>B<><>'
+replace VALUE '<>' '$' && :; RETVAL="$?"
+test "$RETVAL"  '0'                                       'Return value'
+test "$VALUE"   '$A$B$$'                                  'Replacing "<>" -> "$"'
+
+## Attempt shell injection attack
+VALUE="'\";ls"
+replace VALUE ';' '()' && :; RETVAL="$?"
+test "$RETVAL"  '0'                                       'Return value'
+test "$VALUE"   "'\"()ls"                                 'Replacing ";" -> "()"'
+
+## Replace spaces (multiple spaces should be retained)
+VALUE=' hej  du   '
+replace VALUE ' ' '.' && :; RETVAL="$?"
+test "$RETVAL"  '0'                                       'Return value'
+test "$VALUE"   '.hej..du...'                             'Replacing " " -> "."'
+
+VALUE='[]'
+replace VALUE ']' '[' && :; RETVAL="$?"
+test "$RETVAL"  '0'                                       'Return value'
+test "$VALUE"   '[['                                      'Replacing " " -> "."'
+
 ######################################################################
 ##
 ##  Test parse() error messages
@@ -450,7 +617,7 @@ readall() {
 ## Badly placed '...' (at beginning)
 INPUT='...'
 tmpfile TMPFILE
-parse GOTTED_RULES $INPUT 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
+parse GOTTED_RULES "$INPUT" 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
 readall ERRMSG <"$TMPFILE"
 test "$RETVAL" '1'                                      'Return value'
 test "$ERRMSG" "$BIN: Badly placed '...' in rule: ...
