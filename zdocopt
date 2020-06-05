@@ -150,17 +150,19 @@ join() {
 # Replace all occurrences of SUBSTR in the variable VARNAME with REPLACEMENT.
 # Returns false if VARNAME is not a valid variable name, otherwise it will
 # always return true (regardless of whether SUBSTR could be found or not). If
-# SUBSTR couldn't be found VARNAME will remain unmodified.
+# SUBSTR couldn't be found variable VARNAME will remain unmodified. SUBSTR is a
+# *STRING* not a pattern, so a substring of eg '[ab]' will exactly match the
+# string '[ab]' (it does not match either 'a' or 'b' as one might expect).
 replace() {
     [ "$#" -ne 3 ] && warn 'replace: Bad number of arguments' && return 1
     local _VAR="$1" _SUBSTR="$2" _REPL="$3" _REMAIN _LAST; shift 3
     ok_varname "$_VAR" replace || return 1     #
     eval "set -- \"\$$_VAR\""                  # set $1
     while
-        _REMAIN="${1%$_SUBSTR*}"               # get remainder
+        _REMAIN="${1%"$_SUBSTR"*}"             # get remainder
         [ "$_REMAIN" != "$1" ]                 #   while subst is occurring
     do
-        _LAST="${1#$_REMAIN$_SUBSTR}"; shift   # get last substring
+        _LAST="${1#"$_REMAIN$_SUBSTR"}"; shift # get last substring
         set -- "$_REMAIN" "$_LAST" "$@"        #   put remainder + last substr
     done                                       #     separately into $@
     eval "join $_VAR \"$_REPL\" \"\$@\""  # join & put into $_VAR
@@ -238,8 +240,21 @@ replace() {
 # parsing a command line. Also checks the validity/nesting of (...) and [...]
 # constructs. (Failing if brackets or parentheses are unbalanced.)
 parse() {
-    ok_varname "$1" parse || return 1
     local _VAR="$1"; shift
+    local _INPUT="$*"; shift
+    ok_varname "$_VAR" parse || return 1
+
+    local _STR                              # put space around special strings
+    for _STR in '(' '[' '|' ']' ')' '...'; do
+        replace _INPUT "$_STR" " $_STR "
+    done
+
+    local -
+    set -f
+    set -- $_INPUT                             # intentionally unquoted
+
+    #exit
+
     _DEBUG_STATE=''                            # used in testing
     _DEBUG_GROUP=''
     _DEBUG_LEVEL=''
@@ -485,39 +500,6 @@ readall() {
 ##                                                                            ##
 ################################################################################
 
-# ## Replace character at beginning and end
-# VALUE='[A|B]X'
-# echo "$VALUE"
-# replace VALUE ']' 'XX]' && :; RETVAL="$?"
-# test "$RETVAL"  '0'                                       'Return value'
-# test "$VALUE"   '[A|BXX]X'                                'Replacing ":" -> "|"'
-
-# echo ================================================================================
-# # HERE
-# INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   X'
-# LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
-# GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
-# STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 X 8'
-# ## FIXME: These rules should also account for the [...]
-# RULES='0:A -> 2
-# 2:B -> 3
-# 3:C -> 1
-# 0:D -> 4
-# 4:E -> 5
-# 5:F -> 1
-# 0:G -> 6
-# 6:H -> 7
-# 7:I -> 1
-# 1:X -> 8'
-# parse GOTTED_RULES $INPUT && :; RETVAL="$?"    # intentionally unquoted
-# test "$RETVAL"       '0'      'Return value'
-# test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-# test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-# test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-# test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-# exit
-
-
 #############################
 ####  Test ok_varname()  ####
 #############################
@@ -584,30 +566,43 @@ test "$ERRMSG"  "$BIN: replace: Bad variable name 'abc'"  'Error message'
 VALUE=':A:B::'
 replace VALUE ':' '|' && :; RETVAL="$?"
 test "$RETVAL"  '0'                                       'Return value'
-test "$VALUE"   '|A|B||'                                  'Replacing ":" -> "|"'
+test "$VALUE"   '|A|B||'                                  'Replace: : -> |'
 
 ## Replace multi character substring
 VALUE='<>A<>B<><>'
 replace VALUE '<>' '$' && :; RETVAL="$?"
 test "$RETVAL"  '0'                                       'Return value'
-test "$VALUE"   '$A$B$$'                                  'Replacing "<>" -> "$"'
+test "$VALUE"   '$A$B$$'                                  'Replace: <> -> $'
 
 ## Attempt shell injection attack
 VALUE="'\";ls"
 replace VALUE ';' '()' && :; RETVAL="$?"
 test "$RETVAL"  '0'                                       'Return value'
-test "$VALUE"   "'\"()ls"                                 'Replacing ";" -> "()"'
+test "$VALUE"   "'\"()ls"                                 'Replace: ; -> ()'
 
 ## Replace spaces (multiple spaces should be retained)
 VALUE=' hej  du   '
 replace VALUE ' ' '.' && :; RETVAL="$?"
 test "$RETVAL"  '0'                                       'Return value'
-test "$VALUE"   '.hej..du...'                             'Replacing " " -> "."'
+test "$VALUE"   '.hej..du...'                             'Replace: <space> -> .'
 
+# Replace end bracket (with something)
 VALUE='[]'
 replace VALUE ']' '[' && :; RETVAL="$?"
 test "$RETVAL"  '0'                                       'Return value'
-test "$VALUE"   '[['                                      'Replacing " " -> "."'
+test "$VALUE"   '[['                                      'Replace: ] -> ['
+
+## Replace thingy that looks like a character class (but is string literal)
+VALUE='x[ab]x[ba]x'
+replace VALUE '[ab]' '<>' && :; RETVAL="$?"
+test "$RETVAL"  '0'                                       'Return value'
+test "$VALUE"   'x<>x[ba]x'                               'Replace: [ab] -> <>'
+
+## Replace double quotes
+VALUE='x"x"x'
+replace VALUE '"' '<>' && :; RETVAL="$?"
+test "$RETVAL"  '0'                                       'Return value'
+test "$VALUE"   'x<>x<>x'                                 'Replace: " -> <>'
 
 ######################################################################
 ##
