@@ -18,6 +18,8 @@ set -e
 
 # LATER
 # =====
+# FIXME: Each test should be a function (test1...N)
+#        This to allow random order testing + test can show ID on failure.
 # FIXME: Multiple invocations of parse, building up a grammar?
 # FIXME: Allow 'xxx|yyy' (without parentheses) ??
 # FIXME: Stop using $IN and $GROUP? (if possible)
@@ -418,23 +420,39 @@ parse() {
 ################################################################################
 
 TESTS_DONE=''
+FAILED_TESTS=0
+TESTS_COUNT=0
+TEST_OUT=''
 TMPDIR="$(mktemp -dt zdocpt2-XXXXXX)"
 TMPNUM="0"
 BIN="${0##*/}"
 trap "trapfunc \"$TMPDIR\"" EXIT INT
 
 trapfunc() {
-    local TMPDIR="$1"
+    local TMPDIR="$1" EXITCODE=0
     trap - EXIT INT
     [ -d '$TMPDIR' ] && rm -r '$TMPDIR'
-    if [ -z "$TESTS_DONE" ]; then
+    printf '\n'
+    if [ "$TESTS_DONE" ]; then
+        if [ "$FAILED_TESTS" -ne 0 ]; then
+            printf '==============================================\n'
+            printf '== %-40s ==\n' 'ERRORS!!!!!!!!!!!!11111!!!'
+            printf '== %-40s ==\n' "$FAILED_TESTS (of $TESTS_COUNT) tests failed!"
+            printf '==============================================\n'
+            EXITCODE=10
+        else
+            printf "All %s tests passed.\n" "$TESTS_COUNT"
+        fi
+    else
        out '***PREMATURE EXIT! Not all tests ran!'
        printf '==============================================\n'
        printf '== %-40s ==\n' 'ABORTED EXECUTION!!!!!!!!!!!!11111!!!'
        printf '== %-40s ==\n' "Ran $TESTS_COUNT tests before exiting."
        printf '==============================================\n'
+       EXITCODE=15
     fi
-    exit 15
+    [ "$TEST_OUT" ] && printf '%s\n' "$TEST_OUT"
+    exit "$EXITCODE"
 }
 
 # Usage: tmpfile VARNAME
@@ -446,9 +464,6 @@ tmpfile() {
     incvar TMPNUM
 }
 
-FAILED_TESTS=0
-TESTS_COUNT=0
-TEST_OUT=''
 # Usage: test GOT EXPECTED [MESSAGE]
 #
 # Tests if GOT and EXPECTED is the same, return true if this is the case, false
@@ -461,16 +476,16 @@ test() {
         appendnl TEST_OUT "Test $TESTS_COUNT failed!!!"
         appendnl TEST_OUT "    $MSG"
         local FILE1='' FILE2=''; tmpfile FILE1; tmpfile FILE2
-        { appendnl TEST_OUT 'EXPECTED:'; appendnl TEST_OUT "$EXPECTED"; } >"$FILE1"
-        { appendnl TEST_OUT 'GOT:';      appendnl TEST_OUT "$GOT";      } >"$FILE2"
+        appendnl TEST_OUT 'FAILED'
+        { out 'EXPECTED:'; out "$EXPECTED"; } >"$FILE1"
+        { out 'GOT:';      out "$GOT";      } >"$FILE2"
         local WIDTH="$(( $(wc -L <"$FILE1") + $(wc -L <"$FILE2") + 8 ))"
         [ "$WIDTH" -gt "$COLUMNS" ] && WIDTH="$COLUMNS"
-        diff --width="$WIDTH" --color=always --expand-tabs \
-             --side-by-side "$FILE1" "$FILE2" | \
-            while IFS='' read -r LINE; do echo "    $LINE\e[m"; done
+        local TMP="$(diff --width="$WIDTH" --color=always --expand-tabs \
+            --side-by-side "$FILE1" "$FILE2")"
+        prefix TMP '    ' "$TMP"
+        appendnl TEST_OUT "$TMP"
         appendnl TEST_OUT '----------------------------------------'
-        #printfnl '    EXPECTED: %s' '              %s' "$EXPECTED"
-        #printfnl '     BUT GOT: %s' '              %s' "$GOT"
         FAILED_TESTS="$(( FAILED_TESTS + 1 ))"
         printf 'F'
     else
@@ -478,19 +493,12 @@ test() {
     fi
 }
 
+test_info() {
+    appendnl TEST_OUT "$*"
+}
+
 done_testing() {
     TESTS_DONE=1
-    printf '\n'
-    if [ "$FAILED_TESTS" -ne 0 ]; then
-        printf '%s\n' "$TEST_OUT"
-        printf '==============================================\n'
-        printf '== %-40s ==\n' 'ERRORS!!!!!!!!!!!!11111!!!'
-        printf '== %-40s ==\n' "$FAILED_TESTS (of $TESTS_COUNT) tests failed!"
-        printf '==============================================\n'
-        exit 10
-    else
-        printf "All %s tests passed.\n" "$TESTS_COUNT"
-    fi
 }
 
 # Usage: dumpenv VARNAME...
