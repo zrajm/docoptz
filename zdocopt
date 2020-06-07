@@ -269,6 +269,7 @@ parse() {
     local _RULES='' _FINAL=''
     local _GRPMAX=0 _LVL=0 _IN=0               # group count + level, current group
     local _BEG0=0 _END0=0 _GRP0=0 TYPE0='' _BRA0='' _ELL0='' # base states of stacks
+    local _CUR0=0
     # Loop over $@ while setting $A to current arg, and $NEXT to next arg.
     local I=0 A='' NEXT='' PREV=''
     while I="$(( I + 1 ))"; [ "$I" -le "$#" ]; do
@@ -279,21 +280,26 @@ parse() {
         append _DEBUG_LEVEL "$_LVL $A"   || return 1
         case "$A" in
             ['(['])                            # start parenthesis or bracket
+
+                ################################################################
+                #case "$A" in                   #   come-from states
+                #    '[') append "_BRA$_LVL" "$_STATE" # come-from states
+                #esac
+                append "_BRA$_LVL" "$_STATE"   #   come-from states
+                ################################################################
+
                 incvar _LVL                    #   level (paren depth)
                 incvar _GRPMAX                 #   group (paren number)
                 incvar _STATEMAX               #   state counter
                 _IN="$_GRPMAX"                 #   current group
+                local "_BRA$_LVL"              #     bracket come-from states
                 local "_BEG$_LVL"="$_STATE"    #     stack: group start state
                 local "_END$_LVL"="$_STATEMAX" #     stack: group end state
                 local "_GRP$_LVL"="$_GRPMAX"   #     stack: group number
-                local "_ELL$_LVL"=''           #     stack: ellipsis rule
+                local "_ELL$_LVL"=''           #     stack: ellipsis rules
                 case "$A" in                   #     stack: group type
                     '(') local "TYPE$_LVL"=')' ;;
-                    '[') local "TYPE$_LVL"=']'
-                         #appendnl "_ELL$_LVL" "$A -> $_STATE" || return 1
-                         local "_BRA$_LVL"="$_STATE: -> x"
-                         #local "_BRA$_LVL"="$_STATE"
-                         ;;
+                    '[') local "TYPE$_LVL"=']' ;;
                 esac ;;
             '|')                               # pipe
                 # FIXME: Should '||', '[|', '(|', '|]' and '|)' be allowed?
@@ -308,26 +314,6 @@ parse() {
                 [ "$_LVL" -le 0   ] && warn "Too many '$A' in rule: $*" && return 1
                 [ "$A" != "$TYPE" ] && warn "Missing '$A' in rule (group $_IN): $*" && return 1
                 unset TYPE
-
-
-                ################################################################
-                ################################################################
-                if [ "$A" = ']' ];then
-                    local _BRA; getvar _BRA "_BRA$_LVL"
-                    #cho "BRABRABRA: $_BRA"
-                    appendnl "_RULES" "$_BRA" || return 1
-
-                    # local NEWRULES; prefix NEWRULES "$_STATE:" "$_BRA"
-                    # appendnl "_RULES" "$NEWRULES" || return 1
-                    # unset _BRA NEWRULES
-
-                    # #local "_BRA$_LVL"="$_STATE"
-                fi
-                ################################################################
-                ################################################################
-
-
-
                 #getvar _STATE "_END$_LVL"     #     return state to start bracket
                 if [ "$NEXT" = '...' ]; then   #     if followed by '...'
                     local _ELL; getvar _ELL "_ELL$_LVL"
@@ -339,6 +325,11 @@ parse() {
                 unset "_BEG$_LVL" "_END$_LVL" "_GRP$_LVL" "TYPE$_LVL" "_BRA$_LVL" "_ELL$_LVL"
                 decvar _LVL                    #   go down one level
                 getvar _IN "_GRP$_LVL"         #   current group number
+
+                ################################################################
+                case "$A" in ')') unset "_BRA$_LVL"; esac
+                ################################################################
+
                 # FIXME: These lines not covered by test cases!! (necessary?)
                 # (This *should* update state when there are multiple end parentheses.)
                 # case "$NEXT" in [')]'])
@@ -397,6 +388,7 @@ parse() {
         # out "${_DEBUG_INDENT}    ((ELLIPSIS$_LVL: $TMP))"
         # #out "  ${_DEBUG_INDENT}LVL:$_LVL STATE:$_STATE"
         # _DEBUG_INDENT="$_DEBUG_INDENT_NEXT"
+        PREV2="$PREV"
         PREV="$A"
     done
     # Add final state rule to rules.
@@ -535,8 +527,306 @@ readall() {
 ##  Tests                                                                     ##
 ##                                                                            ##
 ################################################################################
-
 unset X                                        # used for in-string 'comments'
+
+INPUT='  [   A   ]   [   B   [   C   ]   [   D   ]   ]'
+LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 [ 2 C 2 ] 1 [ 2 D 2 ] 1 ] 0'
+GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 [ 3 C 3 ] 2 [ 4 D 4 ] 2 ] 0'
+STATE='0 [ 0 A 1 ] 1 [ 1 B 3 [ 3 C 4 ] 4 [ 4 D 5 ] 5 ] 5'
+RULES="0:A -> 1
+0:B -> 3
+1:B -> 3
+3:C -> 4
+3:D -> 5
+4:D -> 5
+0: -> x
+1: -> x
+5: -> x"
+parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
+test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+exit
+
+INPUT='  (   A   )   (   B   )'
+LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
+GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
+STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'
+RULES="0:A -> 1
+1:B -> 2
+2: -> x${X:+                                   # ending rule }"
+parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
+test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+
+# 0 [ 0 A 1 ] 1
+# 0:A -> 1
+# 1:B -> 2
+# 0: -> x
+# 1: -> x
+
+# 0 [ 0 A 1 ] 1 B 2
+# 0:A -> 1
+# 0:B -> 2
+# 1:B -> 2
+# 2: -> x
+
+# 0 [ 0 A 1 ] 1 [ 1 B 2 ] 2 C 3
+# 0:A -> 1
+# 0:B -> 2
+# 1:B -> 2
+# 0:C -> 3
+# 1:C -> 3
+# 2:C -> 3
+
+# 0 [ 0 A 1 ] 1 B 2 [ 2 C 3 ] 3
+# 0:A -> 1
+# 0:B -> 2
+# 1:B -> 2
+# 2:C -> 3
+# 2: -> x
+# 3: -> x
+
+# 0 [ 0 A 1 | 0 B 1 ] 1 C 2 [ 2 D 3 | 2 E 3 ] 3
+# 0:A -> 1
+# 0:B -> 1
+# 0:C -> 2
+# 1:C -> 2
+# 2:D -> 3
+# 2:E -> 3
+# 2: -> x
+# 3: -> x
+
+#   [   A   ]   [   B   ]   [   C   ]
+# 0 [ 0 A 1 ] 1 [ 1 B 2 ] 2 [ 2 C 3 ] 3
+# 0:A -> 1
+# 0:B -> 2
+# 1:B -> 2
+# 0:C -> 3
+# 1:C -> 3
+# 2:C -> 3
+# 0: -> x
+# 1: -> x
+# 2: -> x
+# 3: -> x
+
+#   [   A   ]   [   B   ]   [   C   |   D   ]
+# 0 [ 0 A 1 ] 1 [ 1 B 2 ] 2 [ 2 C 3 | 2 D 3 ] 3
+# 0:A -> 1
+# 0:B -> 2
+# 1:B -> 2
+# 0:C -> 3
+# 1:C -> 3
+# 2:C -> 3
+# 0:D -> 3
+# 1:D -> 3
+# 2:D -> 3
+# 0: -> x
+# 1: -> x
+# 2: -> x
+# 3: -> x
+
+
+#    [   A   ]   [   B   [   C   ]   [   D   ]   ]
+#  0 [ 0 A 1 ] 1 [ 1 B 3 [ 3 C 4 ] 4 [ 4 D 5 ] 5 ] 5
+# 0:A -> 1
+# 0:B -> 3
+# 1:B -> 3
+# 3:C -> 4
+# 3:D -> 5
+# 4:D -> 5
+# 0: -> x
+# 1: -> x
+# 5: -> x
+
+# FROM$LVL
+
+# BEG$LVL
+
+#  [a] [b] $
+# 0   1   2 x
+#
+# 0:a -> 1
+# 0:b -> 2
+# 0:  -> x
+# 1:b -> 2
+# 1:  -> x
+# 2:  -> x
+
+CUR=0
+CURMAX=0
+CUR$LVL=0
+
+loop
+  * LVL
+  * GROUP
+  * GROUPCOUNT
+  * RULES
+  * CUR
+
+
+#  [a] (b) $
+# 0   1   2 x
+#
+# 0:a -> 1
+# 0:b -> 2
+# 0:  -> x
+# 1:b -> 2
+# 1:  -> x ----- GONE
+# 2:  -> x
+
+
+#  (a) [b] $
+# 0   1   2 x
+#
+# 0:a -> 1
+# 0:b -> 2 ----- GONE
+# 0:  -> x ----- GONE
+# 1:b -> 2
+# 1:  -> x
+# 2:  -> x
+
+#  [a] [[b] c] $
+# 0   1    3  2 x
+#
+# 0:a -> 1    a  [0]
+# 0:b -> 3    b  [0 1]
+# 1:b -> 3    b
+# 0:c -> 2    c  [0 1 2]
+# 1:c -> 2    c
+# 3:c -> 2    c
+# 0:  -> x    $  [0 1 2]
+# 1:  -> x
+# 2:  -> x
+
+#  [a] [[b] [c] d] $
+# 0   1    3   4  2 x
+#
+# 0:a -> 1  1 a  [0]
+# 0:b -> 3  2 b  [0 1]
+# 1:b -> 3    b
+# 0:c -> 4  2 c  [0 1 3]
+# 1:c -> 4    c
+# 3:c -> 4    c
+# 0:d -> 2  1 d  [0 2 3 4]
+# 2:d -> 2    d
+# 3:d -> 2    d
+# 4:d -> 2    d
+# 0:  -> x  0 $  [0 1 2]
+# 1:  -> x
+# 2:  -> x
+
+group
+  * '[' or '('
+    o '[' -- set ${CUR$LVL} to $CUR in (outside)
+    o '(' -- set ${CUR$LVL} to ${END$LVL}
+    o increment $LVL
+    o set ${BEG$LVL} to $CUR in (inside)
+  * '|'
+    o restore $CUR from ${BEG$LVL}
+  * ']'
+    o restore $CUR from (outside) ${CUR$LVL}
+  * ')'
+    o set $CUR to $STATE
+  * WORD
+    o generate one rule for each entry in ${CUR$LVL}
+    o set $CUR to post-word $STATE
+
+group:
+  * BEG (multi-value)
+  * END
+  * CUR
+  * ELLIPSIS
+
+# WORD -- increment CUR, set CUR$LVL=$CUR
+#
+# Only increment on WORD
+# Set BEG$LVL and END$LVL on ( or [
+# 
+
+
+# [ ORD
+
+
+
+# [ ( ORD --
+
+# [ (   -- lägg till tillstånd i ${_BRA$(( _LVL - 1 ))}
+#
+# | ORD -- Om ${_BRA$(( _LVL - 1 ))} finns
+#          för varje X i ${_BRA$(( _LVL - 1 ))}
+#              skapa regel 'X:ORD -> STATE'
+#
+# [ ORD -- Om ${_BRA$(( _LVL - 1 ))} finns
+#          för varje X i ${_BRA$(( _LVL - 1 ))}
+#              skapa regel 'X:ORD -> STATE'
+#
+# ( ORD -- Om ${_BRA$(( _LVL - 1 ))} finns
+#          för varje X i ${_BRA$(( _LVL - 1 ))}
+#              skapa regel 'X:ORD -> STATE'
+#
+# )     -- clear ${_BRA$(( _LVL - 1 ))}
+#
+# ORD   -- Om ${_BRA$_LVL} finns
+#          för varje X i ${_BRA$_LVL}
+#              skapa regel 'X:ORD -> STATE'
+#          clear ${_BRA$_LVL}
+
+INPUT='  [   A   ]   [   B   ]'
+LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 ] 0'
+GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 ] 0'
+STATE='0 [ 0 A 1 ] 1 [ 1 B 2 ] 2'
+RULES="0:A -> 1
+0:B -> 2
+1:B -> 2
+0: -> x
+1: -> x
+2: -> x"
+parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
+test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+
+
+exit
+INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...  X'
+LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
+GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
+STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 ... 1 X 8'
+RULES="0:A -> 2
+2:B -> 3
+3:C -> 1
+0:D -> 4
+4:E -> 5
+5:F -> 1
+0:G -> 6
+6:H -> 7
+7:I -> 1
+0: -> x${X:+                                   # bracket rule  }
+1:A -> 2${X:+                                  # ellipsis rule }
+1:D -> 4${X:+                                  # ellipsis rule }
+1:G -> 6${X:+                                  # ellipsis rule }
+1:X -> 8
+8: -> x${X:+                                   # ending rule   }"
+# FIXME: Above bracket rule '0: -> x' is wrong, should be '0:X -> 8'.
+parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
+test "$RETVAL"       '0'      'Return value'
+test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+exit
 
 #############################
 ####  Test ok_varname()  ####
