@@ -99,14 +99,17 @@ eqvar() {
     [ "$A" = "$B" ]
 }
 
-# Usage: VARNAME PREFIX STRING
+# Usage: prefix VARNAME PREFIX
 #
-# Prefix every line in STRING with PREFIX, return in VARNAME.
+# Modifies content in variable VARNAME by prepending PREFIX to all lines in it.
 prefix() {
     local _VAR="$1" _PRE="$2" _ARG='' IFS='
 '                                              # intentional newline
     ok_varname "$_VAR" prefix || return 1      # verify VARNAME
-    set -- $3                                  # intentionally unquoted
+    # Split content of variable named in $1 into lines (since IFS="\n").
+    local -
+    set -o noglob
+    eval "set -- \$$1"
     for _ARG in "$@"; do
         shift
         set -- "$@" "$_PRE$_ARG"
@@ -248,7 +251,6 @@ replace() {
 parse() {
     local _VAR="$1" _INPUT="$2"
     ok_varname "$_VAR" parse || return 1
-
     # Tokenize by adding space round syntactic chars, then split into $@.
     local _STR _SHOPT="$-"                     # save shell options
     for _STR in '(' '[' '|' ']' ')' '...'; do  # foreach syntactic string
@@ -263,7 +265,7 @@ parse() {
     local _STATE=0 _STATEMAX=0
     local _RULES=''
     local _GRPMAX=0 _LVL=0 _IN=0               # group count + level, current group
-    local _BEG0=0 _END0=0 _GRP0=0 TYPE0='' _ELL0='' # base states of stacks
+    local _BEG0=0 _END0=0 _GRP0=0 _TYPE0='' _ELL0='' # base states of stacks
     local _TMP _CUR=0 _CUR0=0
     # Loop over $@ while setting $A to current arg, and $NEXT to next arg.
     local I=0 A='' NEXT='' PREV=''
@@ -285,8 +287,8 @@ parse() {
                 local "_GRP$_LVL"="$_GRPMAX"   #     stack: group number
                 local "_ELL$_LVL"=''           #     stack: ellipsis rules
                 case "$A" in                   #     stack: group type
-                    '(') local "TYPE$_LVL"=')' ;;
-                    '[') local "TYPE$_LVL"=']' ;;
+                    '(') local "_TYPE$_LVL"=')' ;;
+                    '[') local "_TYPE$_LVL"=']' ;;
                 esac ;;
             '|')                               # pipe
                 # FIXME: Should '||', '[|', '(|', '|]' and '|)' be allowed?
@@ -299,20 +301,20 @@ parse() {
                 _STATE="${_STATE##* }"         #
                 getvar _CUR   "_BEG$_LVL" ;;   #   restore group start states
             ['])'])                            # end bracket
-                local TYPE; getvar TYPE "TYPE$_LVL"
+                local _TYPE; getvar _TYPE "_TYPE$_LVL"
                 [ "$_LVL" -le 0   ] && warn "Too many '$A' in rule: $*" && return 1
-                [ "$A" != "$TYPE" ] && warn "Missing '$A' in rule (group $_IN): $*" && return 1
-                unset TYPE
+                [ "$A" != "$_TYPE" ] && warn "Missing '$A' in rule (group $_IN): $*" && return 1
+                unset _TYPE
                 if [ "$NEXT" = '...' ]; then   #     if followed by '...'
                     local _ELL
                     getvar _ELL "_ELL$_LVL"
-                    local NEWRULES
-                    prefix NEWRULES "$_STATE:" "$_ELL"
-                    appendnl "_RULES" "$NEWRULES" || return 1
-                    unset _ELL NEWRULES
+                    local _NEWRULES="$_ELL"
+                    prefix _NEWRULES "$_STATE:"
+                    appendnl "_RULES" "$_NEWRULES" || return 1
+                    unset _ELL _NEWRULES
                 fi
                 # Pop off last element of 'stack's.
-                unset "_BEG$_LVL" "_END$_LVL" "_GRP$_LVL" "TYPE$_LVL" "_ELL$_LVL"
+                unset "_BEG$_LVL" "_END$_LVL" "_GRP$_LVL" "_TYPE$_LVL" "_ELL$_LVL"
                 decvar _LVL                    #   go down one level
                 getvar _IN "_GRP$_LVL"         #   restore previous group number
                 case "$A" in                   #   restore previous come-from states
@@ -387,12 +389,12 @@ parse() {
         appendnl _RULES "$_TMP: -> x" || return 1
     done
     #unset "_GRP0"  # last element of group stack
-    #unset "TYPE0"
+    #unset "_TYPE0"
     append _DEBUG_STATE "$_STATE" || return 1
     append _DEBUG_GROUP "$_IN"    || return 1
     append _DEBUG_LEVEL "$_LVL"   || return 1
     if [ "$_LVL" -ne 0 ]; then
-        local PAREN; getvar PAREN "TYPE$_LVL"
+        local PAREN; getvar PAREN "_TYPE$_LVL"
         warn "Missing '$PAREN' at end of rule: $*"
         return 1
     fi
@@ -451,12 +453,12 @@ tmpfile() {
     incvar TMPNUM
 }
 
-# Usage: test GOT EXPECTED [MESSAGE]
+# Usage: is GOT EXPECTED [DESCRIPTION]
 #
 # Tests if GOT and EXPECTED is the same, return true if this is the case, false
 # otherwise. When returning false, also output a descriptive error message on
 # standard output describing the difference between GOT and EXPECTED.
-test() {
+is() {
     local GOT="$1" EXPECTED="$2" MSG="$3"
     TESTS_COUNT="$(( TESTS_COUNT + 1 ))"
     if [ "$GOT" != "$EXPECTED" ]; then
@@ -469,7 +471,7 @@ test() {
         [ "$WIDTH" -gt "$(( COLUMNS - 4))" ] && WIDTH="$(( COLUMNS - 4))"
         local TMP="$(diff --width="$WIDTH" --color=always --expand-tabs \
             --side-by-side "$FILE1" "$FILE2")"
-        prefix TMP '    ' "$TMP"
+        prefix TMP '    '
         appendnl TEST_OUT "$TMP"
         appendnl TEST_OUT '----------------------------------------'
         FAILED_TESTS="$(( FAILED_TESTS + 1 ))"
@@ -530,11 +532,11 @@ RULES='0:A -> 2
 0: -> x
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   [   B   ]   ]'
@@ -546,11 +548,11 @@ RULES='0:A -> 2
 0: -> x
 3: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   ]   [   B   [   C   ]   [   D   ]   ]'
@@ -567,11 +569,11 @@ RULES='0:A -> 1
 1: -> x
 5: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   ]'
@@ -582,11 +584,11 @@ RULES='0:A -> 1
 0: -> x
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   ]   B'
@@ -598,11 +600,11 @@ RULES='0:A -> 1
 1:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   ]   [   B   ]   C'
@@ -617,11 +619,11 @@ RULES='0:A -> 1
 2:C -> 3
 3: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   ]   B   [   C   ]  '
@@ -635,11 +637,11 @@ RULES='0:A -> 1
 2: -> x
 3: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   |   B   ]   C   [   D   |   E   ]  '
@@ -655,11 +657,11 @@ RULES='0:A -> 1
 2: -> x
 3: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   ]   [   B   ]   [   C   ]'
@@ -677,11 +679,11 @@ RULES='0:A -> 1
 2: -> x
 3: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   ]   [   B   ]   [   C   |   D   ]'
@@ -703,11 +705,11 @@ RULES='0:A -> 1
 2: -> x
 3: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   ]   [   B   [   C   ]   [   D   ]   ]'
@@ -724,11 +726,11 @@ RULES='0:A -> 1
 1: -> x
 5: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   ]   [   B   ]'
@@ -742,11 +744,11 @@ RULES='0:A -> 1
 1: -> x
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   ]   (   B   )'
@@ -758,11 +760,11 @@ RULES='0:A -> 1
 1:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   )   [   B   ]'
@@ -774,11 +776,11 @@ RULES='0:A -> 1
 1: -> x
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   a   ]   [   [   b   ]   c   ]'
@@ -795,11 +797,11 @@ RULES='0:a -> 1
 1: -> x
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   a   ]   [   [   b   ]   [   c   ]   d   ]'
@@ -820,11 +822,11 @@ RULES='0:a -> 1
 1: -> x
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 # NEW VARS $CUR ${CUR$LVL}
@@ -854,11 +856,11 @@ RULES='0:A -> 1
 1: -> x
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...   X'
@@ -881,11 +883,11 @@ RULES='0:A -> 2
 1:X -> 8
 8: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 #############################
@@ -895,19 +897,19 @@ unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 tmpfile TMPFILE
 ok_varname 0ABC 2>"$TMPFILE" && :; RETVAL="$?"
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL"  '1'                                     'Return value'
-test "$ERRMSG"  "$BIN: Bad variable name '0ABC'"        'Error message'
+is "$RETVAL"  '1'                                     'Return value'
+is "$ERRMSG"  "$BIN: Bad variable name '0ABC'"        'Error message'
 
 ## Varname may not contain lower case
 tmpfile TMPFILE
 ok_varname ABCx test 2>"$TMPFILE" && :; RETVAL="$?"
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL"  '1'                                     'Return value'
-test "$ERRMSG"  "$BIN: test: Bad variable name 'ABCx'"  'Error message'
+is "$RETVAL"  '1'                                     'Return value'
+is "$ERRMSG"  "$BIN: test: Bad variable name 'ABCx'"  'Error message'
 
 ## Varname may start with/contain '_'
 ok_varname _ABC && :; RETVAL="$?"
-test "$RETVAL"  '0'                                     'Return value'
+is "$RETVAL"  '0'                                     'Return value'
 
 #########################
 #####  Test join()  #####
@@ -915,16 +917,16 @@ test "$RETVAL"  '0'                                     'Return value'
 tmpfile TMPFILE
 join abc '$' '' '' 1 2 '' 3 '' '' 2>"$TMPFILE" && :; RETVAL="$?"
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL"  '1'                                    'Return value'
-test "$ERRMSG"  "$BIN: join: Bad variable name 'abc'"  'Error message'
+is "$RETVAL"  '1'                                    'Return value'
+is "$ERRMSG"  "$BIN: join: Bad variable name 'abc'"  'Error message'
 
 join VAR '$' '' '' 1 2 '' 3 '' '' && :; RETVAL="$?"
-test "$RETVAL"  '0'           'Return value'
-test "$VAR"     '$$1$2$$3$$'  'Join with "$" as separator'
+is "$RETVAL"  '0'           'Return value'
+is "$VAR"     '$$1$2$$3$$'  'Join with "$" as separator'
 
 join VAR "'" "" "" 1 2 "" 3 "" "" && :; RETVAL="$?"
-test "$RETVAL"  '0'           'Return value'
-test "$VAR"     "''1'2''3''"  'Join with "'\''" as separator'
+is "$RETVAL"  '0'           'Return value'
+is "$VAR"     "''1'2''3''"  'Join with "'\''" as separator'
 
 ############################
 #####  Test replace()  #####
@@ -933,64 +935,64 @@ test "$VAR"     "''1'2''3''"  'Join with "'\''" as separator'
 tmpfile TMPFILE
 (replace abc) 2>"$TMPFILE" && :; RETVAL="$?"
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL"  '1'                                       'Return value'
-test "$ERRMSG"  "$BIN: replace: Bad number of arguments"  'Error message'
+is "$RETVAL"  '1'                                       'Return value'
+is "$ERRMSG"  "$BIN: replace: Bad number of arguments"  'Error message'
 
 ## Call with too many arguments
 tmpfile TMPFILE
 (replace 1 2 3 4) 2>"$TMPFILE" && :; RETVAL="$?"
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL"  '1'                                       'Return value'
-test "$ERRMSG"  "$BIN: replace: Bad number of arguments"  'Error message'
+is "$RETVAL"  '1'                                       'Return value'
+is "$ERRMSG"  "$BIN: replace: Bad number of arguments"  'Error message'
 
 ## Call with invalid variable name (1st arg)
 tmpfile TMPFILE
 (replace abc : :) 2>"$TMPFILE" && :; RETVAL="$?"
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL"  '1'                                       'Return value'
-test "$ERRMSG"  "$BIN: replace: Bad variable name 'abc'"  'Error message'
+is "$RETVAL"  '1'                                       'Return value'
+is "$ERRMSG"  "$BIN: replace: Bad variable name 'abc'"  'Error message'
 
 ## Replace character at beginning and end
 VALUE=':A:B::'
 replace VALUE ':' '|' && :; RETVAL="$?"
-test "$RETVAL"  '0'                                       'Return value'
-test "$VALUE"   '|A|B||'                                  'Replace: : -> |'
+is "$RETVAL"  '0'                                       'Return value'
+is "$VALUE"   '|A|B||'                                  'Replace: : -> |'
 
 ## Replace multi character substring
 VALUE='<>A<>B<><>'
 replace VALUE '<>' '$' && :; RETVAL="$?"
-test "$RETVAL"  '0'                                       'Return value'
-test "$VALUE"   '$A$B$$'                                  'Replace: <> -> $'
+is "$RETVAL"  '0'                                       'Return value'
+is "$VALUE"   '$A$B$$'                                  'Replace: <> -> $'
 
 ## Attempt shell injection attack
 VALUE="'\";ls"
 replace VALUE ';' '()' && :; RETVAL="$?"
-test "$RETVAL"  '0'                                       'Return value'
-test "$VALUE"   "'\"()ls"                                 'Replace: ; -> ()'
+is "$RETVAL"  '0'                                       'Return value'
+is "$VALUE"   "'\"()ls"                                 'Replace: ; -> ()'
 
 ## Replace spaces (multiple spaces should be retained)
 VALUE=' hej  du   '
 replace VALUE ' ' '.' && :; RETVAL="$?"
-test "$RETVAL"  '0'                                       'Return value'
-test "$VALUE"   '.hej..du...'                             'Replace: <space> -> .'
+is "$RETVAL"  '0'                                       'Return value'
+is "$VALUE"   '.hej..du...'                             'Replace: <space> -> .'
 
 # Replace end bracket (with something)
 VALUE='[]'
 replace VALUE ']' '[' && :; RETVAL="$?"
-test "$RETVAL"  '0'                                       'Return value'
-test "$VALUE"   '[['                                      'Replace: ] -> ['
+is "$RETVAL"  '0'                                       'Return value'
+is "$VALUE"   '[['                                      'Replace: ] -> ['
 
 ## Replace thingy that looks like a character class (but is string literal)
 VALUE='x[ab]x[ba]x'
 replace VALUE '[ab]' '<>' && :; RETVAL="$?"
-test "$RETVAL"  '0'                                       'Return value'
-test "$VALUE"   'x<>x[ba]x'                               'Replace: [ab] -> <>'
+is "$RETVAL"  '0'                                       'Return value'
+is "$VALUE"   'x<>x[ba]x'                               'Replace: [ab] -> <>'
 
 ## Replace double quotes
 VALUE='x"x"x'
 replace VALUE '"' '<>' && :; RETVAL="$?"
-test "$RETVAL"  '0'                                       'Return value'
-test "$VALUE"   'x<>x<>x'                                 'Replace: " -> <>'
+is "$RETVAL"  '0'                                       'Return value'
+is "$VALUE"   'x<>x<>x'                                 'Replace: " -> <>'
 
 ######################################################################
 ##
@@ -1002,8 +1004,8 @@ INPUT='...'
 tmpfile TMPFILE
 parse GOTTED_RULES "$INPUT" 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL" '1'                                      'Return value'
-test "$ERRMSG" "$BIN: Badly placed '...' in rule: ...
+is "$RETVAL" '1'                                      'Return value'
+is "$ERRMSG" "$BIN: Badly placed '...' in rule: ...
 (Must come after ARGUMENT or end parenthesis/bracket.)" 'Error message'
 
 ## Badly placed '...' (after start parenthesis)
@@ -1011,8 +1013,8 @@ INPUT='( ...'
 tmpfile TMPFILE
 parse GOTTED_RULES "$INPUT" 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL" '1'                                      'Return value'
-test "$ERRMSG" "$BIN: Badly placed '...' in rule: ( ...
+is "$RETVAL" '1'                                      'Return value'
+is "$ERRMSG" "$BIN: Badly placed '...' in rule: ( ...
 (Must come after ARGUMENT or end parenthesis/bracket.)" 'Error message'
 
 ## Badly placed '|' (outside paren)
@@ -1020,8 +1022,8 @@ INPUT='|'
 tmpfile TMPFILE
 parse GOTTED_RULES "$INPUT" 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL" '1'                                     'Return value'
-test "$ERRMSG" "$BIN: Badly placed '|' in rule: |
+is "$RETVAL" '1'                                     'Return value'
+is "$ERRMSG" "$BIN: Badly placed '|' in rule: |
 (Must be inside parentheses/brackets.)"                'Error message'
 
 ## One ')' too many
@@ -1029,40 +1031,40 @@ INPUT='A )'
 tmpfile TMPFILE
 parse GOTTED_RULES "$INPUT" 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL" '1'                                     'Return value'
-test "$ERRMSG" "$BIN: Too many ')' in rule: A )"       'Error message'
+is "$RETVAL" '1'                                     'Return value'
+is "$ERRMSG" "$BIN: Too many ')' in rule: A )"       'Error message'
 
 ## One ']' too many
 INPUT='A ]'
 tmpfile TMPFILE
 parse GOTTED_RULES "$INPUT" 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL" '1'                                     'Return value'
-test "$ERRMSG" "$BIN: Too many ']' in rule: A ]"       'Error message'
+is "$RETVAL" '1'                                     'Return value'
+is "$ERRMSG" "$BIN: Too many ']' in rule: A ]"       'Error message'
 
 ## Missing ')'
 INPUT='[ A )'
 tmpfile TMPFILE
 parse GOTTED_RULES "$INPUT" 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL" '1'                                     'Return value'
-test "$ERRMSG" "$BIN: Missing ')' in rule (group 1): [ A )" 'Error message'
+is "$RETVAL" '1'                                     'Return value'
+is "$ERRMSG" "$BIN: Missing ')' in rule (group 1): [ A )" 'Error message'
 
 ## Missing ']'
 INPUT='( A ]'
 tmpfile TMPFILE
 parse GOTTED_RULES "$INPUT" 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL" '1'                                     'Return value'
-test "$ERRMSG" "$BIN: Missing ']' in rule (group 1): ( A ]" 'Error message'
+is "$RETVAL" '1'                                     'Return value'
+is "$ERRMSG" "$BIN: Missing ']' in rule (group 1): ( A ]" 'Error message'
 
 ## Missing ']'
 INPUT='( A'
 tmpfile TMPFILE
 parse GOTTED_RULES "$INPUT" 2>"$TMPFILE" && :; RETVAL="$?" # intentionally unquoted
 readall ERRMSG <"$TMPFILE"
-test "$RETVAL" '1'                                     'Return value'
-test "$ERRMSG" "$BIN: Missing ')' at end of rule: ( A" 'Error message'
+is "$RETVAL" '1'                                     'Return value'
+is "$ERRMSG" "$BIN: Missing ')' at end of rule: ( A" 'Error message'
 
 ######################################################################
 ##
@@ -1076,11 +1078,11 @@ STATE='0 A 1'
 RULES='0:A -> 1
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  A   B'
@@ -1091,11 +1093,11 @@ RULES='0:A -> 1
 1:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   B   )'
@@ -1106,11 +1108,11 @@ RULES='0:A -> 2
 2:B -> 1
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   B   ) ...'
@@ -1122,11 +1124,11 @@ RULES='0:A -> 2
 1:A -> 2
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   )   B'
@@ -1137,11 +1139,11 @@ RULES='0:A -> 1
 1:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 # FIXME: '(X...)...' doesn't make sense. Should it be forbidden?
@@ -1155,11 +1157,11 @@ RULES='0:A -> 2
 2:A -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   ...   |   B   )   ...'
@@ -1173,11 +1175,11 @@ RULES='0:A -> 2
 1:B -> 1
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   )   ...   B'
@@ -1189,11 +1191,11 @@ RULES='0:A -> 1
 1:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  A   (   B   )'
@@ -1204,11 +1206,11 @@ RULES='0:A -> 1
 1:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  A   (   B   ) ...'
@@ -1220,11 +1222,11 @@ RULES='0:A -> 1
 2:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   )   (   B   )'
@@ -1235,11 +1237,11 @@ RULES='0:A -> 1
 1:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   )   ...   (   B   )'
@@ -1251,11 +1253,11 @@ RULES='0:A -> 1
 1:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   )   (   B   )   ...'
@@ -1267,11 +1269,11 @@ RULES='0:A -> 1
 2:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   )   ...   (   B   )   ...'
@@ -1284,11 +1286,11 @@ RULES='0:A -> 1
 2:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   (   A   )   B   )'
@@ -1299,11 +1301,11 @@ RULES='0:A -> 2
 2:B -> 1
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   (   B   )   )'
@@ -1314,11 +1316,11 @@ RULES='0:A -> 2
 2:B -> 3
 3: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   (   B   (   C   )   )   )'
@@ -1330,11 +1332,11 @@ RULES='0:A -> 2
 4:C -> 5
 5: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   X'
@@ -1353,11 +1355,11 @@ RULES='0:A -> 2
 1:X -> 8
 8: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   X'
@@ -1377,11 +1379,11 @@ RULES='0:A -> 2
 1:X -> 8
 8: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...   X'
@@ -1404,11 +1406,11 @@ RULES='0:A -> 2
 1:X -> 8
 8: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   )'
@@ -1418,11 +1420,11 @@ STATE='0 ( 0 A 1 ) 1'
 RULES='0:A -> 1
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   (   A   B   )   )'
@@ -1433,11 +1435,11 @@ RULES='0:A -> 3
 3:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   ]'
@@ -1448,11 +1450,11 @@ RULES='0:A -> 1
 0: -> x
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   |   B   )'
@@ -1463,11 +1465,11 @@ RULES='0:A -> 1
 0:B -> 1
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   |   B   )   ...'
@@ -1480,11 +1482,11 @@ RULES='0:A -> 1
 1:B -> 1
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  A   ...   B'
@@ -1496,11 +1498,11 @@ RULES='0:A -> 1
 1:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   ) ... B'
@@ -1512,11 +1514,11 @@ RULES='0:A -> 1
 1:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   B   )   ...'
@@ -1528,11 +1530,11 @@ RULES='0:A -> 2
 1:A -> 2
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   )   (   B   )'
@@ -1543,11 +1545,11 @@ RULES='0:A -> 1
 1:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   )   (   B   )   ...'
@@ -1559,11 +1561,11 @@ RULES='0:A -> 1
 2:B -> 2
 2: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   (   B   )   )   ...'
@@ -1575,11 +1577,11 @@ RULES='0:A -> 2
 3:A -> 2
 3: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   (   A   )   B   )   ...'
@@ -1591,11 +1593,11 @@ RULES='0:A -> 2
 1:A -> 2
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   (   (   A   )   B   )   C   )   ...'
@@ -1608,11 +1610,11 @@ RULES='0:A -> 3
 1:A -> 3
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 
@@ -1627,11 +1629,11 @@ RULES='0:A -> 3
 1:A -> 3
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   (   A   )   ...   B   )'
@@ -1643,11 +1645,11 @@ RULES='0:A -> 2
 2:B -> 1
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   (   A   )   ...   B   )   ...'
@@ -1660,11 +1662,11 @@ RULES='0:A -> 2
 1:A -> 2
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   (   B   (   C   )   )   )   ...'
@@ -1677,11 +1679,11 @@ RULES='0:A -> 2
 5:A -> 2
 5: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 ######################################################################
@@ -1704,11 +1706,11 @@ RULES='0:A -> 2
 7:I -> 1
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]'
@@ -1727,11 +1729,11 @@ RULES='0:A -> 2
 0: -> x
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   ...'
@@ -1752,11 +1754,11 @@ RULES='0:A -> 2
 1:G -> 6
 1: -> x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ] ...'
@@ -1783,17 +1785,17 @@ BEGENV="$(dumpenv \
     GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
 )" # expect
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-test "$RETVAL"       '0'      'Return value'
-test "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-test "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-test "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-test "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
+is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
+is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 ENDENV="$(dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE BEGENV ENDENV \
     GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
 )" # got
-test "$ENDENV" "$BEGENV"      "Variable leakage: '$INPUT'"
+is "$ENDENV" "$BEGENV"      "Variable leakage: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 done_testing
