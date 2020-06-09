@@ -684,11 +684,9 @@ replace VALUE '"' '<>' && :; RETVAL="$?"
 is "$RETVAL"  '0'                                       'Return value'
 is "$VALUE"   'x<>x<>x'                                 'Replace: " -> <>'
 
-######################################################################
-##
-##  Test parse() error messages
-##
-
+#########################################
+#####  Test parse() error messages  #####
+#########################################
 ## Badly placed '...' (at beginning)
 INPUT='...'
 tmpfile TMPFILE
