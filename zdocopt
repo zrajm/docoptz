@@ -142,6 +142,34 @@ appendnl() {
 }\$2\""                                        # intentional newline
 }
 
+# Usage: readdoc VARNAME <FILE
+#
+# Extract the doc string from a block of text passed on standard input, and
+# return it in the variable VARNAME. Return false if VARNAME is not a valid
+# variable name, or if no input was provided on stdin. The first chunk of
+# contiguous lines which starts with `# ` in the input are considered the
+# docstring. Docstring is terminated by the first line not starting with `# `,
+# and may be preceeded by non-docstring lines. Empty lines (containing a single
+# `#`) are also allowed within the docstring (and result in an empty line in
+# the output). Shebang lines (starting with `#!`) does not terminate the
+# docstring, but not included in the output either.
+#
+# Typically invoked with `readdoc varname <"$0"`
+readdoc() {
+    local _
+    [ -t 0 ] && warn "readdoc: Missing input on STDIN" && return 1
+    ok_varname "$1" readdoc || return 1
+    setvar "$1" ''
+    while IFS='' read -r _; do
+        case "$_" in
+            '#!'*) :;;                         # ignore shebang
+            '#')   appendnl "$1" '' ;;         # blank line
+            '# '*) appendnl "$1" "${_#\# }" ;; # docstring
+            *)  ifvar "$1" && break ;;         # terminate docstring
+        esac
+    done
+}
+
 # Usage: join VARNAME SEP STR...
 #
 # Joins all STR together, using SEP as separator. The result is put into
@@ -526,6 +554,12 @@ readall() {
 ##                                                                            ##
 ################################################################################
 
+if [ ! -t 0 ]; then
+    warn "ERROR: Test suite require that STDIN is not connected to pipe!"
+    trap - EXIT
+    exit 30
+fi
+
 ########################
 ####  Test ifvar()  ####
 ########################
@@ -682,6 +716,129 @@ VALUE='x"x"x'
 replace VALUE '"' '<>' && :; RETVAL="$?"
 is "$RETVAL"  '0'                                       'Return value'
 is "$VALUE"   'x<>x<>x'                                 'Replace: " -> <>'
+
+############################
+#####  Test readdoc()  #####
+############################
+## Call with missing input on STDIN
+tmpfile TMPFILE
+readdoc 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"  '1'                                      'Return value'
+is "$ERRMSG"  "$BIN: readdoc: Missing input on STDIN"  'Error message'
+unset ERRMSG TMPFILE
+
+## Call with missing argument
+tmpfile TMPFILE
+readdoc 2>"$TMPFILE" <&- && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"  '1'                                      'Return value'
+is "$ERRMSG"  "$BIN: readdoc: Bad variable name ''"    'Error message'
+unset ERRMSG TMPFILE
+
+## Content with only docstring
+DOC="comment string"
+tmpfile TMPFILE
+readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+# comment string
+EOF
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"       '0'              'Return value'
+is "$ERRMSG"       ''               'Error message'
+is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
+unset DOC ERRMSG GOTTED_DOC TMPFILE
+
+## Docstring ending in newline
+DOC="comment string"
+tmpfile TMPFILE
+readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+# comment string
+
+EOF
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"       '0'              'Return value'
+is "$ERRMSG"       ''               'Error message'
+is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
+unset DOC ERRMSG GOTTED_DOC TMPFILE
+
+## Docstring ending with shell command
+DOC="comment string"
+tmpfile TMPFILE
+readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+# comment string
+shell-command
+EOF
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"       '0'              'Return value'
+is "$ERRMSG"       ''               'Error message'
+is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
+unset DOC ERRMSG GOTTED_DOC TMPFILE
+
+## Ignore shebang(s) in docstring
+DOC="comment string"
+tmpfile TMPFILE
+readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+#!/she/bang
+# comment string
+#! a docstring 'comment'
+EOF
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"       '0'              'Return value'
+is "$ERRMSG"       ''               'Error message'
+is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
+unset DOC ERRMSG GOTTED_DOC TMPFILE
+
+## Some text/commands before docstr
+DOC="comment string
+comment string"
+tmpfile TMPFILE
+readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+#!/she/bang
+shell-command(s)
+# comment string
+# comment string
+EOF
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"       '0'              'Return value'
+is "$ERRMSG"       ''               'Error message'
+is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
+unset DOC ERRMSG GOTTED_DOC TMPFILE
+
+## Only get first comment block, ignore subsequent ones
+DOC="comment string"
+tmpfile TMPFILE
+readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+#!/she/bang
+shell-command
+# comment string
+
+# comment string
+EOF
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"       '0'              'Return value'
+is "$ERRMSG"       ''               'Error message'
+is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
+unset DOC ERRMSG GOTTED_DOC TMPFILE
+
+## Comment may contain blank lines (except at beginning)
+DOC="comment string
+
+comment string
+"
+tmpfile TMPFILE
+readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+#!/she/bang
+shell-command
+# comment string
+#
+# comment string
+#
+EOF
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"       '0'              'Return value'
+is "$ERRMSG"       ''               'Error message'
+is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
+unset DOC ERRMSG GOTTED_DOC TMPFILE
 
 #########################################
 #####  Test parse() error messages  #####
