@@ -93,10 +93,7 @@ match() {
 eqvar() {
     ok_varname "$1" eqvar || return 1
     ok_varname "$2" eqvar || return 1
-    local A B
-    getvar A "$1"
-    getvar B "$2"
-    [ "$A" = "$B" ]
+    eval "[ \"\$$1\" = \"\$$2\" ]"
 }
 
 # Usage: prefix VARNAME PREFIX
