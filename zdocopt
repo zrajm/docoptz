@@ -86,6 +86,14 @@ match() {
     return 1
 }
 
+# Usage: ifvar VARNAME
+#
+# Returns true (0) if variable is non-zero in length, false (1) otherwise.
+ifvar() {
+    ok_varname "$1" ifvar || return 1
+    eval "[ \"\$$1\" ]"
+}
+
 # Usage: eqvar VARNAME1 VARNAME2
 #
 # Returns true (0) if variables VARNAME1 and VARNAME2 have identical content,
@@ -518,6 +526,25 @@ readall() {
 ##  Tests                                                                     ##
 ##                                                                            ##
 ################################################################################
+
+########################
+####  Test ifvar()  ####
+########################
+tmpfile TMPFILE
+ifvar a 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"  '1'                                   'Return value'
+is "$ERRMSG"  "$BIN: ifvar: Bad variable name 'a'"  'Error message'
+
+A='('
+ifvar A && :; RETVAL="$?"
+is "$RETVAL"       '0'      'Return value'
+unset A
+
+A=''
+ifvar A && :; RETVAL="$?"
+is "$RETVAL"       '1'      'Return value'
+unset A
 
 ########################
 ####  Test eqvar()  ####
