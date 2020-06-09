@@ -47,7 +47,7 @@ warn() {
 # digits (except that the first character may not be a digit).
 ok_varname() {
     case "$1" in
-        *[!A-Z0-9_]*|[0-9]*)
+        ''|*[!A-Z0-9_]*|[0-9]*)
             warn "${2:+$2: }Bad variable name '$1'"
             return 1 ;;
         *)
@@ -576,6 +576,13 @@ unset A B
 #############################
 ####  Test ok_varname()  ####
 #############################
+## Varname may not be empty
+tmpfile TMPFILE
+ok_varname '' 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"  '1'                                     'Return value'
+is "$ERRMSG"  "$BIN: Bad variable name ''"            'Error message'
+
 ## Varname may not start with digit
 tmpfile TMPFILE
 ok_varname 0ABC 2>"$TMPFILE" && :; RETVAL="$?"
