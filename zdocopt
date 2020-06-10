@@ -215,8 +215,8 @@ replace() {
 # constructs. (Failing if brackets or parentheses are unbalanced.)
 #
 # The generated rules will be saved in the specified RULESVAR. Each rule is
-# separated by an newline, and is of the format 'STATE:INPUT -> ENDSTATE', or
-# just 'ENDSTATE'.
+# separated by an newline, and is of the format 'STARTSTATE ENDSTATE [INPUT]'.
+# If no INPUT is present, then ENDSTATE is always 'x'.
 #
 # The following special characters are recognized:
 #   * Group start: '[' or '('
@@ -341,7 +341,7 @@ parse() {
                     local _ELL
                     getvar _ELL "_ELL$_LVL"
                     local _NEWRULES="$_ELL"
-                    prefix _NEWRULES "$_STATE:"
+                    prefix _NEWRULES "$_STATE "
                     appendnl "_RULES" "$_NEWRULES" || return 1
                     unset _ELL _NEWRULES
                 fi
@@ -378,21 +378,21 @@ parse() {
                         _STATE="$_STATEMAX" ;;
                 esac
                 for _TMP in $_CUR; do          # intentionally unquoted
-                    appendnl _RULES "$_TMP:$A -> $_STATE" || return 1
+                    appendnl _RULES "$_TMP $_STATE $A" || return 1
                 done
                 _CUR="$_STATE"
                 # If followed by '...' add rule to self.
                 if [ "$NEXT" = '...' ]; then
-                    appendnl _RULES "$_STATE:$A -> $_STATE" || return 1
+                    appendnl _RULES "$_STATE $_STATE $A" || return 1
                 fi
                 case "$PREV" in ['[(|'])       # add ellipsis rule
-                    appendnl "_ELL$_LVL" "$A -> $_STATE" || return 1
+                    appendnl "_ELL$_LVL" "$_STATE $A" || return 1
                     # If this group and previous group start at same state (ie
                     # leading parenthesis is doubled, tripled etc) then copy
                     # ellipsis rules to previous group as well.
                     local _J="$_LVL"
                     while decvar _J && [ "$_J" -gt 0 ] && eqvar "_BEG$_LVL" "_BEG$_J"; do
-                        appendnl "_ELL$_J" "$A -> $_STATE" || return 1
+                        appendnl "_ELL$_J" "$_STATE $A" || return 1
                     done
                 esac ;;
         esac
@@ -418,7 +418,7 @@ parse() {
     done
     # Add final state rules to rules.
     for _TMP in $_CUR; do                      # intentionally unquoted
-        appendnl _RULES "$_TMP: -> x" || return 1
+        appendnl _RULES "$_TMP x" || return 1
     done
     #unset "_GRP0"  # last element of group stack
     #unset "_TYPE0"
@@ -918,11 +918,11 @@ INPUT='  [   [   A   ]   B   ]'
 LEVEL='0 [ 1 [ 2 A 2 ] 1 B 1 ] 0'
 GROUP='0 [ 1 [ 2 A 2 ] 1 B 1 ] 0'
 STATE='0 [ 0 [ 0 A 2 ] 2 B 1 ] 1'
-RULES='0:A -> 2
-0:B -> 1
-2:B -> 1
-0: -> x
-1: -> x'
+RULES='0 2 A
+0 1 B
+2 1 B
+0 x
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -935,10 +935,10 @@ INPUT='  [   A   [   B   ]   ]'
 LEVEL='0 [ 1 A 1 [ 2 B 2 ] 1 ] 0'
 GROUP='0 [ 1 A 1 [ 2 B 2 ] 1 ] 0'
 STATE='0 [ 0 A 2 [ 2 B 3 ] 3 ] 3'
-RULES='0:A -> 2
-2:B -> 3
-0: -> x
-3: -> x'
+RULES='0 2 A
+2 3 B
+0 x
+3 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -951,15 +951,15 @@ INPUT='  [   A   ]   [   B   [   C   ]   [   D   ]   ]'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 [ 2 C 2 ] 1 [ 2 D 2 ] 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 [ 3 C 3 ] 2 [ 4 D 4 ] 2 ] 0'
 STATE='0 [ 0 A 1 ] 1 [ 1 B 3 [ 3 C 4 ] 4 [ 4 D 5 ] 5 ] 5'
-RULES='0:A -> 1
-0:B -> 3
-1:B -> 3
-3:C -> 4
-3:D -> 5
-4:D -> 5
-0: -> x
-1: -> x
-5: -> x'
+RULES='0 1 A
+0 3 B
+1 3 B
+3 4 C
+3 5 D
+4 5 D
+0 x
+1 x
+5 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -972,9 +972,9 @@ INPUT='  [   A   ]'
 LEVEL='0 [ 1 A 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0'
 STATE='0 [ 0 A 1 ] 1'
-RULES='0:A -> 1
-0: -> x
-1: -> x'
+RULES='0 1 A
+0 x
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -987,10 +987,10 @@ INPUT='  [   A   ]   B'
 LEVEL='0 [ 1 A 1 ] 0 B 0'
 GROUP='0 [ 1 A 1 ] 0 B 0'
 STATE='0 [ 0 A 1 ] 1 B 2'
-RULES='0:A -> 1
-0:B -> 2
-1:B -> 2
-2: -> x'
+RULES='0 1 A
+0 2 B
+1 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1003,13 +1003,13 @@ INPUT='  [   A   ]   [   B   ]   C'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 ] 0 C 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 ] 0 C 0'
 STATE='0 [ 0 A 1 ] 1 [ 1 B 2 ] 2 C 3'
-RULES='0:A -> 1
-0:B -> 2
-1:B -> 2
-0:C -> 3
-1:C -> 3
-2:C -> 3
-3: -> x'
+RULES='0 1 A
+0 2 B
+1 2 B
+0 3 C
+1 3 C
+2 3 C
+3 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1022,12 +1022,12 @@ INPUT='  [   A   ]   B   [   C   ]  '
 LEVEL='0 [ 1 A 1 ] 0 B 0 [ 1 C 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 B 0 [ 2 C 2 ] 0'
 STATE='0 [ 0 A 1 ] 1 B 2 [ 2 C 3 ] 3'
-RULES='0:A -> 1
-0:B -> 2
-1:B -> 2
-2:C -> 3
-2: -> x
-3: -> x'
+RULES='0 1 A
+0 2 B
+1 2 B
+2 3 C
+2 x
+3 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1040,14 +1040,14 @@ INPUT='  [   A   |   B   ]   C   [   D   |   E   ]  '
 LEVEL='0 [ 1 A 1 | 1 B 1 ] 0 C 0 [ 1 D 1 | 1 E 1 ] 0'
 GROUP='0 [ 1 A 1 | 1 B 1 ] 0 C 0 [ 2 D 2 | 2 E 2 ] 0'
 STATE='0 [ 0 A 1 | 0 B 1 ] 1 C 2 [ 2 D 3 | 2 E 3 ] 3'
-RULES='0:A -> 1
-0:B -> 1
-0:C -> 2
-1:C -> 2
-2:D -> 3
-2:E -> 3
-2: -> x
-3: -> x'
+RULES='0 1 A
+0 1 B
+0 2 C
+1 2 C
+2 3 D
+2 3 E
+2 x
+3 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1060,16 +1060,16 @@ INPUT='  [   A   ]   [   B   ]   [   C   ]'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 ] 0 [ 1 C 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 ] 0 [ 3 C 3 ] 0'
 STATE='0 [ 0 A 1 ] 1 [ 1 B 2 ] 2 [ 2 C 3 ] 3'
-RULES='0:A -> 1
-0:B -> 2
-1:B -> 2
-0:C -> 3
-1:C -> 3
-2:C -> 3
-0: -> x
-1: -> x
-2: -> x
-3: -> x'
+RULES='0 1 A
+0 2 B
+1 2 B
+0 3 C
+1 3 C
+2 3 C
+0 x
+1 x
+2 x
+3 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1083,19 +1083,19 @@ LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 ] 0 [ 1 C 1 | 1 D 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 ] 0 [ 3 C 3 | 3 D 3 ] 0'
 STATE='0 [ 0 A 1 ] 1 [ 1 B 2 ] 2 [ 2 C 3 | 2 D 3 ] 3'
 #      0 [ 0 A 1 ] 1 [ 1 B 2 ] 2 [ 2 C 3 | 0 1 2 D 3 ] 3 FIXME < '0 1 2' BUG
-RULES='0:A -> 1
-0:B -> 2
-1:B -> 2
-0:C -> 3
-1:C -> 3
-2:C -> 3
-0:D -> 3
-1:D -> 3
-2:D -> 3
-0: -> x
-1: -> x
-2: -> x
-3: -> x'
+RULES='0 1 A
+0 2 B
+1 2 B
+0 3 C
+1 3 C
+2 3 C
+0 3 D
+1 3 D
+2 3 D
+0 x
+1 x
+2 x
+3 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1108,15 +1108,15 @@ INPUT='  [   A   ]   [   B   [   C   ]   [   D   ]   ]'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 [ 2 C 2 ] 1 [ 2 D 2 ] 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 [ 3 C 3 ] 2 [ 4 D 4 ] 2 ] 0'
 STATE='0 [ 0 A 1 ] 1 [ 1 B 3 [ 3 C 4 ] 4 [ 4 D 5 ] 5 ] 5'
-RULES='0:A -> 1
-0:B -> 3
-1:B -> 3
-3:C -> 4
-3:D -> 5
-4:D -> 5
-0: -> x
-1: -> x
-5: -> x'
+RULES='0 1 A
+0 3 B
+1 3 B
+3 4 C
+3 5 D
+4 5 D
+0 x
+1 x
+5 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1129,12 +1129,12 @@ INPUT='  [   A   ]   [   B   ]'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 ] 0'
 STATE='0 [ 0 A 1 ] 1 [ 1 B 2 ] 2'
-RULES='0:A -> 1
-0:B -> 2
-1:B -> 2
-0: -> x
-1: -> x
-2: -> x'
+RULES='0 1 A
+0 2 B
+1 2 B
+0 x
+1 x
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1147,10 +1147,10 @@ INPUT='  [   A   ]   (   B   )'
 LEVEL='0 [ 1 A 1 ] 0 ( 1 B 1 ) 0'
 GROUP='0 [ 1 A 1 ] 0 ( 2 B 2 ) 0'
 STATE='0 [ 0 A 1 ] 1 ( 1 B 2 ) 2'
-RULES='0:A -> 1
-0:B -> 2
-1:B -> 2
-2: -> x'
+RULES='0 1 A
+0 2 B
+1 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1163,10 +1163,10 @@ INPUT='  (   A   )   [   B   ]'
 LEVEL='0 ( 1 A 1 ) 0 [ 1 B 1 ] 0'
 GROUP='0 ( 1 A 1 ) 0 [ 2 B 2 ] 0'
 STATE='0 ( 0 A 1 ) 1 [ 1 B 2 ] 2'
-RULES='0:A -> 1
-1:B -> 2
-1: -> x
-2: -> x'
+RULES='0 1 A
+1 2 B
+1 x
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1179,15 +1179,15 @@ INPUT='  [   a   ]   [   [   b   ]   c   ]'
 LEVEL='0 [ 1 a 1 ] 0 [ 1 [ 2 b 2 ] 1 c 1 ] 0'
 GROUP='0 [ 1 a 1 ] 0 [ 2 [ 3 b 3 ] 2 c 2 ] 0'
 STATE='0 [ 0 a 1 ] 1 [ 1 [ 1 b 3 ] 3 c 2 ] 2'
-RULES='0:a -> 1
-0:b -> 3
-1:b -> 3
-0:c -> 2
-1:c -> 2
-3:c -> 2
-0: -> x
-1: -> x
-2: -> x'
+RULES='0 1 a
+0 3 b
+1 3 b
+0 2 c
+1 2 c
+3 2 c
+0 x
+1 x
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1200,19 +1200,19 @@ INPUT='  [   a   ]   [   [   b   ]   [   c   ]   d   ]'
 LEVEL='0 [ 1 a 1 ] 0 [ 1 [ 2 b 2 ] 1 [ 2 c 2 ] 1 d 1 ] 0'
 GROUP='0 [ 1 a 1 ] 0 [ 2 [ 3 b 3 ] 2 [ 4 c 4 ] 2 d 2 ] 0'
 STATE='0 [ 0 a 1 ] 1 [ 1 [ 1 b 3 ] 3 [ 3 c 4 ] 4 d 2 ] 2'
-RULES='0:a -> 1
-0:b -> 3
-1:b -> 3
-0:c -> 4
-1:c -> 4
-3:c -> 4
-0:d -> 2
-1:d -> 2
-3:d -> 2
-4:d -> 2
-0: -> x
-1: -> x
-2: -> x'
+RULES='0 1 a
+0 3 b
+1 3 b
+0 4 c
+1 4 c
+3 4 c
+0 2 d
+1 2 d
+3 2 d
+4 2 d
+0 x
+1 x
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1225,12 +1225,12 @@ INPUT='  [   A   ]   [   B   ]'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 ] 0'
 STATE='0 [ 0 A 1 ] 1 [ 1 B 2 ] 2'
-RULES='0:A -> 1
-0:B -> 2
-1:B -> 2
-0: -> x
-1: -> x
-2: -> x'
+RULES='0 1 A
+0 2 B
+1 2 B
+0 x
+1 x
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1243,21 +1243,21 @@ INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...   X'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
 STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 ... 1 X 8'
-RULES='0:A -> 2
-2:B -> 3
-3:C -> 1
-0:D -> 4
-4:E -> 5
-5:F -> 1
-0:G -> 6
-6:H -> 7
-7:I -> 1
-1:A -> 2
-1:D -> 4
-1:G -> 6
-0:X -> 8
-1:X -> 8
-8: -> x'
+RULES='0 2 A
+2 3 B
+3 1 C
+0 4 D
+4 5 E
+5 1 F
+0 6 G
+6 7 H
+7 1 I
+1 2 A
+1 4 D
+1 6 G
+0 8 X
+1 8 X
+8 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1270,8 +1270,8 @@ INPUT='  A'
 LEVEL='0 A 0'
 GROUP='0 A 0'
 STATE='0 A 1'
-RULES='0:A -> 1
-1: -> x'
+RULES='0 1 A
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1284,9 +1284,9 @@ INPUT='  A   B'
 LEVEL='0 A 0 B 0'
 GROUP='0 A 0 B 0'
 STATE='0 A 1 B 2'
-RULES='0:A -> 1
-1:B -> 2
-2: -> x'
+RULES='0 1 A
+1 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1299,9 +1299,9 @@ INPUT='  (   A   B   )'
 LEVEL='0 ( 1 A 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 B 1 ) 0'
 STATE='0 ( 0 A 2 B 1 ) 1'
-RULES='0:A -> 2
-2:B -> 1
-1: -> x'
+RULES='0 2 A
+2 1 B
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1314,10 +1314,10 @@ INPUT='  (   A   B   ) ...'
 LEVEL='0 ( 1 A 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 B 1 ) 0 ... 0'
 STATE='0 ( 0 A 2 B 1 ) 1 ... 1'
-RULES='0:A -> 2
-2:B -> 1
-1:A -> 2
-1: -> x'
+RULES='0 2 A
+2 1 B
+1 2 A
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1330,9 +1330,9 @@ INPUT='  (   A   )   B'
 LEVEL='0 ( 1 A 1 ) 0 B 0'
 GROUP='0 ( 1 A 1 ) 0 B 0'
 STATE='0 ( 0 A 1 ) 1 B 2'
-RULES='0:A -> 1
-1:B -> 2
-2: -> x'
+RULES='0 1 A
+1 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1347,10 +1347,10 @@ INPUT='  (   A   ...   )   ...'          # Does this make sense?
 LEVEL='0 ( 1 A 1 ... 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ... 1 ) 0 ... 0'
 STATE='0 ( 0 A 2 ... 2 ) 2 ... 2'
-RULES='0:A -> 2
-2:A -> 2
-2:A -> 2
-2: -> x'
+RULES='0 2 A
+2 2 A
+2 2 A
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1363,12 +1363,12 @@ INPUT='  (   A   ...   |   B   )   ...'
 LEVEL='0 ( 1 A 1 ... 1 | 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ... 1 | 1 B 1 ) 0 ... 0'
 STATE='0 ( 0 A 2 ... 2 | 0 B 1 ) 1 ... 1'  FINAL='2'
-RULES='0:A -> 2
-2:A -> 2
-0:B -> 1
-1:A -> 2
-1:B -> 1
-1: -> x'
+RULES='0 2 A
+2 2 A
+0 1 B
+1 2 A
+1 1 B
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1381,10 +1381,10 @@ INPUT='  (   A   )   ...   B'
 LEVEL='0 ( 1 A 1 ) 0 ... 0 B 0'
 GROUP='0 ( 1 A 1 ) 0 ... 0 B 0'
 STATE='0 ( 0 A 1 ) 1 ... 1 B 2'
-RULES='0:A -> 1
-1:A -> 1
-1:B -> 2
-2: -> x'
+RULES='0 1 A
+1 1 A
+1 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1397,9 +1397,9 @@ INPUT='  A   (   B   )'
 LEVEL='0 A 0 ( 1 B 1 ) 0'
 GROUP='0 A 0 ( 1 B 1 ) 0'
 STATE='0 A 1 ( 1 B 2 ) 2'
-RULES='0:A -> 1
-1:B -> 2
-2: -> x'
+RULES='0 1 A
+1 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1412,10 +1412,10 @@ INPUT='  A   (   B   ) ...'
 LEVEL='0 A 0 ( 1 B 1 ) 0 ... 0'
 GROUP='0 A 0 ( 1 B 1 ) 0 ... 0'
 STATE='0 A 1 ( 1 B 2 ) 2 ... 2'
-RULES='0:A -> 1
-1:B -> 2
-2:B -> 2
-2: -> x'
+RULES='0 1 A
+1 2 B
+2 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1428,9 +1428,9 @@ INPUT='  (   A   )   (   B   )'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
 STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'
-RULES='0:A -> 1
-1:B -> 2
-2: -> x'
+RULES='0 1 A
+1 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1443,10 +1443,10 @@ INPUT='  (   A   )   ...   (   B   )'
 LEVEL='0 ( 1 A 1 ) 0 ... 0 ( 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0 ... 0 ( 2 B 2 ) 0'
 STATE='0 ( 0 A 1 ) 1 ... 1 ( 1 B 2 ) 2'
-RULES='0:A -> 1
-1:A -> 1
-1:B -> 2
-2: -> x'
+RULES='0 1 A
+1 1 A
+1 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1459,10 +1459,10 @@ INPUT='  (   A   )   (   B   )   ...'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0 ... 0'
 STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2 ... 2'
-RULES='0:A -> 1
-1:B -> 2
-2:B -> 2
-2: -> x'
+RULES='0 1 A
+1 2 B
+2 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1475,11 +1475,11 @@ INPUT='  (   A   )   ...   (   B   )   ...'
 LEVEL='0 ( 1 A 1 ) 0 ... 0 ( 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ) 0 ... 0 ( 2 B 2 ) 0 ... 0'
 STATE='0 ( 0 A 1 ) 1 ... 1 ( 1 B 2 ) 2 ... 2'
-RULES='0:A -> 1
-1:A -> 1
-1:B -> 2
-2:B -> 2
-2: -> x'
+RULES='0 1 A
+1 1 A
+1 2 B
+2 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1492,9 +1492,9 @@ INPUT='  (   (   A   )   B   )'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
 GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
 STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1'
-RULES='0:A -> 2
-2:B -> 1
-1: -> x'
+RULES='0 2 A
+2 1 B
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1507,9 +1507,9 @@ INPUT='  (   A   (   B   )   )'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
 GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
 STATE='0 ( 0 A 2 ( 2 B 3 ) 3 ) 3'              # (state 1 never used)
-RULES='0:A -> 2
-2:B -> 3
-3: -> x'
+RULES='0 2 A
+2 3 B
+3 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1522,10 +1522,10 @@ INPUT='  (   A   (   B   (   C   )   )   )'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0'
 GROUP='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0'
 STATE='0 ( 0 A 2 ( 2 B 4 ( 4 C 5 ) 5 ) 5 ) 5'  # (state 1 & 3 never used)
-RULES='0:A -> 2
-2:B -> 4
-4:C -> 5
-5: -> x'
+RULES='0 2 A
+2 4 B
+4 5 C
+5 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1538,17 +1538,17 @@ INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   X'
 LEVEL='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 X 0'
 GROUP='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 X 0'
 STATE='0 ( 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ) 1 X 8'
-RULES='0:A -> 2
-2:B -> 3
-3:C -> 1
-0:D -> 4
-4:E -> 5
-5:F -> 1
-0:G -> 6
-6:H -> 7
-7:I -> 1
-1:X -> 8
-8: -> x'
+RULES='0 2 A
+2 3 B
+3 1 C
+0 4 D
+4 5 E
+5 1 F
+0 6 G
+6 7 H
+7 1 I
+1 8 X
+8 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1561,18 +1561,18 @@ INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   X'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
 STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 X 8'
-RULES='0:A -> 2
-2:B -> 3
-3:C -> 1
-0:D -> 4
-4:E -> 5
-5:F -> 1
-0:G -> 6
-6:H -> 7
-7:I -> 1
-0:X -> 8
-1:X -> 8
-8: -> x'
+RULES='0 2 A
+2 3 B
+3 1 C
+0 4 D
+4 5 E
+5 1 F
+0 6 G
+6 7 H
+7 1 I
+0 8 X
+1 8 X
+8 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1585,21 +1585,21 @@ INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...   X'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
 STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 ... 1 X 8'
-RULES='0:A -> 2
-2:B -> 3
-3:C -> 1
-0:D -> 4
-4:E -> 5
-5:F -> 1
-0:G -> 6
-6:H -> 7
-7:I -> 1
-1:A -> 2
-1:D -> 4
-1:G -> 6
-0:X -> 8
-1:X -> 8
-8: -> x'
+RULES='0 2 A
+2 3 B
+3 1 C
+0 4 D
+4 5 E
+5 1 F
+0 6 G
+6 7 H
+7 1 I
+1 2 A
+1 4 D
+1 6 G
+0 8 X
+1 8 X
+8 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1612,8 +1612,8 @@ INPUT='  (   A   )'
 LEVEL='0 ( 1 A 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0'
 STATE='0 ( 0 A 1 ) 1'
-RULES='0:A -> 1
-1: -> x'
+RULES='0 1 A
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1626,9 +1626,9 @@ INPUT='  (   (   A   B   )   )'
 LEVEL='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
 GROUP='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
 STATE='0 ( 0 ( 0 A 3 B 2 ) 2 ) 2'
-RULES='0:A -> 3
-3:B -> 2
-2: -> x'
+RULES='0 3 A
+3 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1641,9 +1641,9 @@ INPUT='  [   A   ]'
 LEVEL='0 [ 1 A 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0'
 STATE='0 [ 0 A 1 ] 1'
-RULES='0:A -> 1
-0: -> x
-1: -> x'
+RULES='0 1 A
+0 x
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1656,9 +1656,9 @@ INPUT='  (   A   |   B   )'
 LEVEL='0 ( 1 A 1 | 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 | 1 B 1 ) 0'
 STATE='0 ( 0 A 1 | 0 B 1 ) 1'
-RULES='0:A -> 1
-0:B -> 1
-1: -> x'
+RULES='0 1 A
+0 1 B
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1671,11 +1671,11 @@ INPUT='  (   A   |   B   )   ...'
 LEVEL='0 ( 1 A 1 | 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 | 1 B 1 ) 0 ... 0'
 STATE='0 ( 0 A 1 | 0 B 1 ) 1 ... 1'
-RULES='0:A -> 1
-0:B -> 1
-1:A -> 1
-1:B -> 1
-1: -> x'
+RULES='0 1 A
+0 1 B
+1 1 A
+1 1 B
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1688,10 +1688,10 @@ INPUT='  A   ...   B'
 LEVEL='0 A 0 ... 0 B 0'
 GROUP='0 A 0 ... 0 B 0'
 STATE='0 A 1 ... 1 B 2'
-RULES='0:A -> 1
-1:A -> 1
-1:B -> 2
-2: -> x'
+RULES='0 1 A
+1 1 A
+1 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1704,10 +1704,10 @@ INPUT='  (   A   ) ... B'
 LEVEL='0 ( 1 A 1 ) 0 ... 0 B 0'
 GROUP='0 ( 1 A 1 ) 0 ... 0 B 0'
 STATE='0 ( 0 A 1 ) 1 ... 1 B 2'
-RULES='0:A -> 1
-1:A -> 1
-1:B -> 2
-2: -> x'
+RULES='0 1 A
+1 1 A
+1 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1720,10 +1720,10 @@ INPUT='  (   A   B   )   ...'
 LEVEL='0 ( 1 A 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 B 1 ) 0 ... 0'
 STATE='0 ( 0 A 2 B 1 ) 1 ... 1'
-RULES='0:A -> 2
-2:B -> 1
-1:A -> 2
-1: -> x'
+RULES='0 2 A
+2 1 B
+1 2 A
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1736,9 +1736,9 @@ INPUT='  (   A   )   (   B   )'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
 STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'
-RULES='0:A -> 1
-1:B -> 2
-2: -> x'
+RULES='0 1 A
+1 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1751,10 +1751,10 @@ INPUT='  (   A   )   (   B   )   ...'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0 ... 0'
 STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2 ... 2'
-RULES='0:A -> 1
-1:B -> 2
-2:B -> 2
-2: -> x'
+RULES='0 1 A
+1 2 B
+2 2 B
+2 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1767,10 +1767,10 @@ INPUT='  (   A   (   B   )   )   ...'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0 ... 0'
 STATE='0 ( 0 A 2 ( 2 B 3 ) 3 ) 3 ... 3'
-RULES='0:A -> 2
-2:B -> 3
-3:A -> 2
-3: -> x'
+RULES='0 2 A
+2 3 B
+3 2 A
+3 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1783,10 +1783,10 @@ INPUT='  (   (   A   )   B   )   ...'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
 STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1 ... 1'
-RULES='0:A -> 2
-2:B -> 1
-1:A -> 2
-1: -> x'
+RULES='0 2 A
+2 1 B
+1 2 A
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1799,11 +1799,11 @@ INPUT='  (   (   (   A   )   B   )   C   )   ...'
 LEVEL='0 ( 1 ( 2 ( 3 A 3 ) 2 B 2 ) 1 C 1 ) 0 ... 0'
 GROUP='0 ( 1 ( 2 ( 3 A 3 ) 2 B 2 ) 1 C 1 ) 0 ... 0'
 STATE='0 ( 0 ( 0 ( 0 A 3 ) 3 B 2 ) 2 C 1 ) 1 ... 1'
-RULES='0:A -> 3
-3:B -> 2
-2:C -> 1
-1:A -> 3
-1: -> x'
+RULES='0 3 A
+3 2 B
+2 1 C
+1 3 A
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1817,12 +1817,12 @@ INPUT='  (   (   (   A   )   ...   B   )   C   )   ...'
 LEVEL='0 ( 1 ( 2 ( 3 A 3 ) 2 ... 2 B 2 ) 1 C 1 ) 0 ... 0'
 GROUP='0 ( 1 ( 2 ( 3 A 3 ) 2 ... 2 B 2 ) 1 C 1 ) 0 ... 0'
 STATE='0 ( 0 ( 0 ( 0 A 3 ) 3 ... 3 B 2 ) 2 C 1 ) 1 ... 1'
-RULES='0:A -> 3
-3:A -> 3
-3:B -> 2
-2:C -> 1
-1:A -> 3
-1: -> x'
+RULES='0 3 A
+3 3 A
+3 2 B
+2 1 C
+1 3 A
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1835,10 +1835,10 @@ INPUT='  (   (   A   )   ...   B   )'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 ... 1 B 1 ) 0'
 GROUP='0 ( 1 ( 2 A 2 ) 1 ... 1 B 1 ) 0'
 STATE='0 ( 0 ( 0 A 2 ) 2 ... 2 B 1 ) 1'
-RULES='0:A -> 2
-2:A -> 2
-2:B -> 1
-1: -> x'
+RULES='0 2 A
+2 2 A
+2 1 B
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1851,11 +1851,11 @@ INPUT='  (   (   A   )   ...   B   )   ...'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 ... 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 ( 2 A 2 ) 1 ... 1 B 1 ) 0 ... 0'
 STATE='0 ( 0 ( 0 A 2 ) 2 ... 2 B 1 ) 1 ... 1'
-RULES='0:A -> 2
-2:A -> 2
-2:B -> 1
-1:A -> 2
-1: -> x'
+RULES='0 2 A
+2 2 A
+2 1 B
+1 2 A
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1868,11 +1868,11 @@ INPUT='  (   A   (   B   (   C   )   )   )   ...'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0 ... 0'
 STATE='0 ( 0 A 2 ( 2 B 4 ( 4 C 5 ) 5 ) 5 ) 5 ... 5'
-RULES='0:A -> 2
-2:B -> 4
-4:C -> 5
-5:A -> 2
-5: -> x'
+RULES='0 2 A
+2 4 B
+4 5 C
+5 2 A
+5 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1890,16 +1890,16 @@ INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )'
 LEVEL='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0'
 GROUP='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0'
 STATE='0 ( 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ) 1'
-RULES='0:A -> 2
-2:B -> 3
-3:C -> 1
-0:D -> 4
-4:E -> 5
-5:F -> 1
-0:G -> 6
-6:H -> 7
-7:I -> 1
-1: -> x'
+RULES='0 2 A
+2 3 B
+3 1 C
+0 4 D
+4 5 E
+5 1 F
+0 6 G
+6 7 H
+7 1 I
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1912,17 +1912,17 @@ INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0'
 STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1'
-RULES='0:A -> 2
-2:B -> 3
-3:C -> 1
-0:D -> 4
-4:E -> 5
-5:F -> 1
-0:G -> 6
-6:H -> 7
-7:I -> 1
-0: -> x
-1: -> x'
+RULES='0 2 A
+2 3 B
+3 1 C
+0 4 D
+4 5 E
+5 1 F
+0 6 G
+6 7 H
+7 1 I
+0 x
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1935,19 +1935,19 @@ INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   ...'
 LEVEL='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 ... 0'
 STATE='0 ( 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ) 1 ... 1'
-RULES='0:A -> 2
-2:B -> 3
-3:C -> 1
-0:D -> 4
-4:E -> 5
-5:F -> 1
-0:G -> 6
-6:H -> 7
-7:I -> 1
-1:A -> 2
-1:D -> 4
-1:G -> 6
-1: -> x'
+RULES='0 2 A
+2 3 B
+3 1 C
+0 4 D
+4 5 E
+5 1 F
+0 6 G
+6 7 H
+7 1 I
+1 2 A
+1 4 D
+1 6 G
+1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
 is "$RETVAL"       '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
@@ -1960,20 +1960,20 @@ INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ] ...'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0'
 STATE='0 [ 0 A 2 B 3 C 1 | 0 D 4 E 5 F 1 | 0 G 6 H 7 I 1 ] 1 ... 1'
-RULES='0:A -> 2
-2:B -> 3
-3:C -> 1
-0:D -> 4
-4:E -> 5
-5:F -> 1
-0:G -> 6
-6:H -> 7
-7:I -> 1
-1:A -> 2
-1:D -> 4
-1:G -> 6
-0: -> x
-1: -> x'
+RULES='0 2 A
+2 3 B
+3 1 C
+0 4 D
+4 5 E
+5 1 F
+0 6 G
+6 7 H
+7 1 I
+1 2 A
+1 4 D
+1 6 G
+0 x
+1 x'
 BEGENV="$(dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE BEGENV ENDENV \
