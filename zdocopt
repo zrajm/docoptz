@@ -342,7 +342,6 @@ parse() {
     set -- $_INPUT                             # intentionally unquoted
     case "$_SHOPT" in *f*) ;; *) set +f; esac  # restore noglob state
     _DEBUG_STATE=''                            # used in testing
-    _DEBUG_PRESTATE=''
     _DEBUG_GROUP=''
     _DEBUG_LEVEL=''
     local _STATE=0 _STATEMAX=0
@@ -351,52 +350,7 @@ parse() {
     local _BEG0=0 _END0=0 _GRP0=0 _TYPE0='' _ELL0='' # base states of stacks
     local _TMP _CUR=0 _CUR0=0
     # Loop over $@ while setting $A to current arg, and $NEXT to next arg.
-    #local I=0 A='' NEXT='' NEXTNEXT='' PREV=''
-
-    # _DEBUG_PRESTATE=''
-    # _DEBUG_PREGROUP=''
-    # _DEBUG_PRELEVEL=''
-    # local _I=0 _A='' _LVL=0 _GRPMAX _STATEMAX=-1 _WORD='' _IN=0 _GRP0=0
-    # for _A in "$@"; do
-    #     #echo ">>$_A"
-    #     append _DEBUG_PRESTATE "$_STATE $_A" || return 1
-    #     append _DEBUG_PREGROUP "$_IN $_A"    || return 1
-    #     append _DEBUG_PRELEVEL "$_LVL $_A"   || return 1
-    #     _STATE=''
-    #     case "$_A" in
-    #         ['(['])
-    #             incvar _LVL                    #   level (paren depth)
-    #             incvar _GRPMAX                 #   group (paren number)
-    #             local "_GRP$_LVL"="$_GRPMAX"   #     stack: group number
-    #             _IN="$_GRPMAX"                 #   current group
-    #             #echo "(($_IN"
-    #             #echo "(($_GRPMAX<<"
-    #             ;;
-    #         ['])'])                            # end bracket
-    #             decvar _LVL                    #   level (paren depth)
-    #             getvar _IN "_GRP$_LVL"         #   restore previous group number
-
-    #             #incvar _STATEMAX               #   state counter
-    #             #echo "))::$_IN"
-    #             #local "_END$_IN"="$_STATEMAX" #     stack: group end state
-
-    #             #local "_GRP$_LVL"="$_GRPMAX"   #     stack: group number
-    #             #local "_END$_LVL"="$_STATEMAX" #     stack: group end state
-    #             #local "_END$_IN"="$_STATEMAX"  #     stack: group end state
-    #             ;;
-    #         '|'|'...') ;;                      # ignore these
-    #         *) _WORD=1 ;;                      # note presence of word
-    #     esac
-    #     _I="$(( _I + 1 ))"
-    # done
-    # unset _A _I _LVL _GRPMAX _STATEMAX _WORD _IN _GRP0
-    # #unset _A _I _LVL _IN
-
-    append _DEBUG_PRESTATE "$_STATE" || return 1
-    append _DEBUG_PREGROUP "$_IN"    || return 1
-    append _DEBUG_PRELEVEL "$_LVL"   || return 1
-
-    local I=0 A='' _LVL=0 _STATEMAX=-1 _WORD='' _IN=0 _GRP0=0
+    local I=0 A='' NEXT='' PREV=''
     while I="$(( I + 1 ))"; [ "$I" -le "$#" ]; do
         eval    A="\"\$$I\""                   # current arg
         eval NEXT="\"\$$(( I + 1 ))\""         #   next arg
@@ -530,72 +484,6 @@ parse() {
     setvar "$_VAR" "$_RULES"
 }
 
-
-:<<'#BLOCK_COMMENT'
-
-# something() {
-#     local _DOC
-#     readdoc _DOC <"$0"
-#     while IFS="" read -r LINE; do
-#         out ">>$LINE<<"
-#     done <<EOF
-# $_DOC
-# EOF
-#     #echo ">>$_DOC<<"
-# }
-# something
-# exit
-
-
-# HERE
-#readdoc _DOC <"$0"
-#parse RULES '(-h|--help|-t|--test|-v|--version)'
-#echo ">>$RULES<<"
-
-parse RULES '( ship ( new NAME... | NAME move X Y [--speed=KN] | shoot X Y ) | mine (set|remove) X Y [--moored|--drifting] |  -h | --help | --version )'
-
-echo "$RULES"
-exit
-
-MAIN=''
-FINAL=''
-while read -r FROM TO STR; do
-    out ">>FROM:$FROM"
-    echo -n "  STR:$STR<<"
-    if [ "$STR" ]; then
-        echo "  (set)"
-    else
-        append FINAL "$FROM"
-        echo "  (not set)"
-    fi
-    out "  TO:$TO<<"
-done <<EOF
-     $RULES
-EOF
-
-echo "FINAL: $FINAL"
-exit
-
-STATE=0
-for ARG in "$@"; do
-    echo ">>$STATE:$ARG"
-    case "$STATE:$ARG" in
-        "0:-h") STATE="1" ;;
-        "0:--help") STATE="1" ;;
-        "0:-t") STATE="1" ;;
-        "0:--test") STATE="1" ;;
-        "0:-v") STATE="1" ;;
-        "0:--version") STATE="1" ;;
-        "1:") STATE="x" ;;
-    esac
-done
-if [ "$STATE" != x ]; then
-    warn "bad args"
-    exit 42
-fi
-exit
-#BLOCK_COMMENT
-
 ################################################################################
 ##                                                                            ##
 ##  Test "Framework"                                                          ##
@@ -657,8 +545,6 @@ is() {
     local GOT="$1" EXPECTED="$2" MSG="$3"
     TESTS_COUNT="$(( TESTS_COUNT + 1 ))"
     if [ "$GOT" != "$EXPECTED" ]; then
-        echo "$EXPECTED" >expected                           # DELETEME
-        echo "$GOT" >got                                     # DELETEME
         appendnl TEST_OUT "Test $TESTS_COUNT failed!!!"
         appendnl TEST_OUT "    $MSG"
         local FILE1='' FILE2=''; tmpfile FILE1; tmpfile FILE2
@@ -724,9 +610,6 @@ if [ ! -t 0 ]; then
     trap - EXIT
     exit 30
 fi
-
-#FIXME REMOVE THIS
-#:<<'#BLOCK_COMMENT'
 
 ########################
 ####  Test ifvar()  ####
@@ -1092,21 +975,9 @@ RULES='0 2 A
 0 x
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"          '0'      'Return value'
-is "$_DEBUG_LEVEL"    "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_PRELEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP"    "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_PREGROUP" "$GROUP" "Group numbers: '$INPUT'"
-
-echo
-echo ">>$INPUT<<"
-echo ">>$_DEBUG_PREGROUP<<"
-
-echo ">>>$_DEBUG_PRESTATE"
-exit
-
-
-
+is "$RETVAL"       '0'      'Return value'
+is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
+is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
@@ -2179,8 +2050,6 @@ ENDENV="$(dumpenv \
 )" # got
 is "$ENDENV" "$BEGENV"      "Variable leakage: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
-#BLOCK_COMMENT
-
 
 ## '...' (after word) inside end of parentheses
 INPUT='  (   A   |   B   ...   )'
@@ -2215,7 +2084,7 @@ INPUT='  (   A   |   (   B   )   ...   )'
 LEVEL='0 ( 1 A 1 | 1 ( 2 B 2 ) 1 ... 1 ) 0'
 GROUP='0 ( 1 A 1 | 1 ( 2 B 2 ) 1 ... 1 ) 0'
 STATE='0 ( 0 A 1 | 0 ( 0 B 2 ) 2 ... 2 ) 2'       # <-- FIXME Expected BAD result
-#STATE='0 ( 0 A 1 | 0 ( 0 B 1 ) 1 ... 1 ) 1'       #     DESIRED result
+#STATE='0 ( 0 A 1 | 0 ( 0 B 1 ) 1 ... 1 ) 1'      #     DESIRED result
 RULES="0 1 A
 0 1 B
 1 1 B
@@ -2244,7 +2113,7 @@ INPUT='  (   A   |   [   B   ]   ...   )'
 LEVEL='0 ( 1 A 1 | 1 [ 2 B 2 ] 1 ... 1 ) 0'
 GROUP='0 ( 1 A 1 | 1 [ 2 B 2 ] 1 ... 1 ) 0'
 STATE='0 ( 0 A 1 | 0 [ 0 B 2 ] 2 ... 2 ) 2'       # <-- FIXME Expected BAD result
-#TATE='0 ( 0 A 1 | 0 [ 0 B 1 ] 1 ... 1 ) 1'       #     DESIRED result
+#STATE='0 ( 0 A 1 | 0 [ 0 B 1 ] 1 ... 1 ) 1'      #     DESIRED result
 RULES=''
 BEGENV="$(dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
@@ -2266,10 +2135,7 @@ is "$ENDENV" "$BEGENV"      "Variable leakage: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
 
 :<<'#BLOCK_COMMENT'
-
 exit
-
-
 
 
 ################################################################################
