@@ -68,6 +68,8 @@ set -e
 # FIXME: Allow 'xxx|yyy' (without parentheses) ??
 # FIXME: Stop using $IN and $GROUP? (if possible)
 # FIXME: Remove dead code
+# FIXME: Use `set -eu`
+# FIXME: Check variable name and add tests for incvar(), decvar() (more?)
 
 #DEBUG=1
 DEBUG="${DEBUG:-}"
@@ -113,12 +115,19 @@ getarg() { eval "$1=\"\${$(($2 + 2))}\""; }
 # Usage: getvar VARNAME1 VARNAME2
 #
 # Set VARNAME1 to whatever variable VARNAME2 contains.
-getvar() { eval "$1=\"\${$2}\""; }
+getvar() {
+    ok_varname "$1" getvar || return 1
+    ok_varname "$2" getvar || return 1
+    eval "$1=\"\${$2}\""
+}
 
 # Usage: setvar VARNAME VALUE
 #
 # Set variable VARNAME to the specified value.
-setvar() { eval "$1=\"\$2\""; }
+setvar() {
+    ok_varname "$1" setvar || return 1
+    eval "$1=\"\$2\""
+}
 
 # Usage: incvar VARNAME
 #
@@ -614,6 +623,41 @@ unset GOTTED
 
 getarg GOTTED 10 a b c d e f g h i j && :; RETVAL="$?"
 is "$GOTTED"       'j'      'Gotted value'
+is "$RETVAL"       '0'      'Return value'
+unset GOTTED
+
+#########################
+####  Test getvar()  ####
+#########################
+tmpfile TMPFILE
+getvar a 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"  '1'                                   'Return value'
+is "$ERRMSG"  "$BIN: getvar: Bad variable name 'a'" 'Error message'
+
+tmpfile TMPFILE
+getvar A b 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"  '1'                                   'Return value'
+is "$ERRMSG"  "$BIN: getvar: Bad variable name 'b'" 'Error message'
+
+VAL="()"
+getvar GOTTED VAL && :; RETVAL="$?"
+is "$GOTTED"       '()'     'Gotted value'
+is "$RETVAL"       '0'      'Return value'
+unset GOTTED VAL
+
+#########################
+####  Test setvar()  ####
+#########################
+tmpfile TMPFILE
+setvar a 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"  '1'                                   'Return value'
+is "$ERRMSG"  "$BIN: setvar: Bad variable name 'a'" 'Error message'
+
+setvar GOTTED '()' && :; RETVAL="$?"
+is "$GOTTED"       '()'     'Gotted value'
 is "$RETVAL"       '0'      'Return value'
 unset GOTTED
 
