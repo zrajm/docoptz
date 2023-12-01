@@ -585,11 +585,11 @@ dumpenv() {
 # trailing final trailing newline is added.
 readall() {
     local _
-    eval "$1"=''
     while IFS='' read -r _; do
-        eval "$1"="\"\${$1:+\${$1}
-}\$_\""                                        # intentional newline
+        set -- "$1" "${2:+$2
+}$_"                                           # intentional newline
     done
+    setvar "$1" "$2"
 }
 
 ################################################################################
