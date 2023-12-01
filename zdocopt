@@ -104,6 +104,12 @@ ok_varname() {
     esac
 }
 
+# Usage: getarg VARNAME NUM ARG...
+#
+# Set VARNAME to `$ARG[NUM]`. Use to extract single argument from from `$@`
+# with `getarg THIS 2 "$@"`. INDEX must be between 1 and $#.
+getarg() { eval "$1=\"\${$(($2 + 2))}\""; }
+
 # Usage: getvar VARNAME1 VARNAME2
 #
 # Set VARNAME1 to whatever variable VARNAME2 contains.
@@ -350,10 +356,10 @@ parse() {
     local _BEG0=0 _END0=0 _GRP0=0 _TYPE0='' _ELL0='' # base states of stacks
     local _TMP _CUR=0 _CUR0=0
     # Loop over $@ while setting $A to current arg, and $NEXT to next arg.
-    local I=0 A='' NEXT='' PREV=''
+    local I=0 A='' NEXT='' PREV='' _NEXTNEXT
     while I="$(( I + 1 ))"; [ "$I" -le "$#" ]; do
-        eval    A="\"\${$I}\""                 # current arg
-        eval NEXT="\"\${$(( I + 1 ))}\""       #   next arg
+        getarg A    "$I"           "$@"        # current arg
+        getarg NEXT "$(( I + 1 ))" "$@"        #   next arg
         append _DEBUG_STATE "$_STATE $A" || return 1
         append _DEBUG_GROUP "$_IN $A"    || return 1
         append _DEBUG_LEVEL "$_LVL $A"   || return 1
@@ -420,7 +426,7 @@ parse() {
                     return 1
                 fi ;;
             *)                                 # anything else
-                eval local _NEXTNEXT="\"\${$(( I + 2 )):-}\""
+                getarg _NEXTNEXT "$(( I + 2 ))" "$@"
                 case "$NEXT:$_NEXTNEXT" in     #   this is last word in a group
                     ['|)]']':'*|'...:'['|)]']) #     use end state of bracket
                         getvar _STATE "_END$_LVL" ;;
@@ -610,6 +616,19 @@ if [ ! -t 0 ]; then
     trap - EXIT
     exit 30
 fi
+
+#########################
+####  Test getarg()  ####
+#########################
+getarg GOTTED 1 a b c d e f g h i j && :; RETVAL="$?"
+is "$GOTTED"       'a'      'Gotted value'
+is "$RETVAL"       '0'      'Return value'
+unset GOTTED
+
+getarg GOTTED 10 a b c d e f g h i j && :; RETVAL="$?"
+is "$GOTTED"       'j'      'Gotted value'
+is "$RETVAL"       '0'      'Return value'
+unset GOTTED
 
 ########################
 ####  Test ifvar()  ####
