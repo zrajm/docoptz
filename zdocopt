@@ -352,8 +352,8 @@ parse() {
     # Loop over $@ while setting $A to current arg, and $NEXT to next arg.
     local I=0 A='' NEXT='' PREV=''
     while I="$(( I + 1 ))"; [ "$I" -le "$#" ]; do
-        eval    A="\"\$$I\""                   # current arg
-        eval NEXT="\"\$$(( I + 1 ))\""         #   next arg
+        eval    A="\"\${$I}\""                 # current arg
+        eval NEXT="\"\${$(( I + 1 ))}\""       #   next arg
         append _DEBUG_STATE "$_STATE $A" || return 1
         append _DEBUG_GROUP "$_IN $A"    || return 1
         append _DEBUG_LEVEL "$_LVL $A"   || return 1
