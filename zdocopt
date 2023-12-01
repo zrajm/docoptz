@@ -261,7 +261,7 @@ replace() {
         _LAST="${1#"$_REMAIN$_SUBSTR"}"; shift # get last substring
         set -- "$_REMAIN" "$_LAST" "$@"        #   put remainder + last substr
     done                                       #     separately into $@
-    eval "join $_VAR \"$_REPL\" \"\$@\""  # join & put into $_VAR
+    join "$_VAR" "$_REPL" "$@"                 # join & put into $_VAR
 }
 
 # Usage: parse RULESVAR TOKENIZED
