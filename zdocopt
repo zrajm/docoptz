@@ -92,11 +92,13 @@ warn() {
 }
 #die() { warn "$@"; exit 5; }
 
-# Usage: ok_varname VARNAME
+# Usage: ok_varname VARNAME [FROMSTR]
 #
-# Checks if VARNAME is a valid shell variable name returns true if is, false
-# otherwise. A variable name may only contain upper case letters, '_' and
-# digits (except that the first character may not be a digit).
+# Returns true if VARNAME is a valid shell variable name, otherwise output
+# error message on STDERR, and return false. (If FROMSTR is specified, it will
+# preced the error any error message -- typically FROMSTR is the name of the
+# calling function). A variable name may only contain upper case letters, '_'
+# and digits (though the first character must not be a digit).
 ok_varname() {
     case "$1" in
         ''|*[!A-Z0-9_]*|[0-9]*)
@@ -132,6 +134,8 @@ setvar() {
 # Usage: incvar VARNAME
 #
 # Sets variable VARNAME to 0 if unset, otherwise increment VARNAME by one.
+# NOTE: If VARNAME contains the name of a variable, then, counter-intutively,
+# that variable is incremented.
 incvar() { eval "$1=\"\$((\${$1:--1} + 1))\""; } #VAR="$((${VAR:--1} + 1))"
 
 # Usage: decvar VARNAME
@@ -413,9 +417,9 @@ parse() {
                 # esac
                 ;;
             '...')                             # ellipsis
-                ## This state only handles where an ellipsis is allowed. Actual
-                ## ellipsis logic is ran in the end group state, and ARG state
-                ## where al the needed variables are already set.
+                ## This state only handles if an ellipsis is allowed. Actual
+                ## ellipsis logic runs in the end group state, and ARG state
+                ## where all the needed variables are already set.
                 if [ "$I" = 1 ] || match '["|(["]|...' "$PREV"; then
                     warn "Badly placed '...' in rule: $*" \
                          '(Must come after ARGUMENT or end parenthesis/bracket.)'
