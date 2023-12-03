@@ -194,18 +194,19 @@ eqvar() {
 #
 # Modifies content in variable VARNAME by prepending PREFIX to all lines in it.
 prefix() {
-    local _VAR="$1" _PRE="$2" _ARG='' IFS='
+    ok_varname "$1" prefix || return 1
+    # Globbing is turned off (`set -f`) locally (`local -`) otherwise the
+    # `IFS`/`set` linesplitting also glob expands words containing '*' (iff
+    # there are matching files) -- which would be very confusing.
+    local - _VAR="$1" _PRE="$2" _ARG='' IFS='
 '                                              # intentional newline
-    ok_varname "$_VAR" prefix || return 1      # verify VARNAME
-    # Split content of variable named in $1 into lines (since IFS="\n").
-    local -
-    set -o noglob
-    eval "set -- \${$1}"
+    set -f                                     # disable globbing
+    eval "set -- \${$1}"                       # linesplit VARNAME into $@
     for _ARG in "$@"; do
         shift
         set -- "$@" "$_PRE$_ARG"
     done
-    eval "$_VAR"="\$*"
+    eval "$_VAR=\$*"
 }
 
 # Usage: append VARNAME STRING
