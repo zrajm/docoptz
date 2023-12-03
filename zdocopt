@@ -158,20 +158,6 @@ decvar() {
     eval "$1='$(($2 - 1))'"
 }
 
-# Usage: matchvar VARNAME PATTERN
-#
-# Return true if the 'case' clause PATTERN matches content of variable VARNAME,
-# false otherwise. Double quotes in PATTERN must be preceded by backslash (i.e.
-# use '\"', not just '"') since PATTERN is eval:ed as-is. (Because of this
-# inserting a PATTERN from a user can be huge security problem, so make sure
-# your PATTERN is properly vetted, or better yet, a string literal.)
-matchvar() {
-    ok_varname "$1" matchvar || return 10
-    eval "set -- \"\${$1}\" \"\$2\""           # put $VARNAME content in $1
-    eval "case \"\$1\" in ($2) return 0; esac"
-    return 1
-}
-
 # Usage: ifvar VARNAME
 #
 # Returns true (0) if variable is non-zero in length, false (1) otherwise.
@@ -439,7 +425,8 @@ parse() {
                 ## This state only handles if an ellipsis is allowed. Actual
                 ## ellipsis logic runs in the end group state, and ARG state
                 ## where all the needed variables are already set.
-                if [ "$I" = 1 ] || matchvar PREV '["|(["]|...'; then
+                _TMP=''; case "$PREV" in (['|([']|...) _TMP=1; esac
+                if [ "$I" = 1 -o "$_TMP" = 1 ]; then
                     warn "Badly placed '...' in rule: $*" \
                          '(Must come after ARGUMENT or end parenthesis/bracket.)'
                     return 1
@@ -891,56 +878,6 @@ decvar VALUE && :; RETVAL="$?"
 is "$VALUE"        '65535'  'Gotted value'
 is "$RETVAL"       '0'      'Return value'
 unset VALUE
-
-###########################
-####  Test matchvar()  ####
-###########################
-
-## Failing with invalid haystack variable name
-tmpfile TMPFILE
-matchvar haystack 2>"$TMPFILE" && :; RETVAL="$?"
-readall ERRMSG <"$TMPFILE"
-is "$RETVAL"  '10'             'Return value'
-is "$ERRMSG"  \
-   "$BIN: matchvar: Bad variable name 'haystack'" \
-   'Error message'
-
-## Failure with unescaped double quote
-tmpfile TMPFILE
-(matchvar HAYSTACK '"') 2>"$TMPFILE" && :; RETVAL="$?"
-readall ERRMSG <"$TMPFILE"
-is "$RETVAL"    '2'            'Return value'
-is "$ERRMSG"    \
-   "./$BIN: 1: eval: Syntax error: Unterminated quoted string" \
-   'Error message'
-
-## Matching with escaped double quote
-HAYSTACK='"'
-matchvar HAYSTACK '\"' && :; RETVAL="$?"
-is "$HAYSTACK"  '"'            'Haystack should be unmodified'
-is "$RETVAL"    '0'            'Return value'
-unset HAYSTACK
-
-## Matching with 'character class'
-HAYSTACK='x'
-matchvar HAYSTACK '[xyz]' && :; RETVAL="$?"
-is "$HAYSTACK"  'x'            'Haystack should be unmodified'
-is "$RETVAL"    '0'            'Return value'
-unset HAYSTACK
-
-## Matching with negated 'character class'
-HAYSTACK='x'
-matchvar HAYSTACK '[!0-9]' && :; RETVAL="$?"
-is "$HAYSTACK"  'x'            'Haystack should be unmodified'
-is "$RETVAL"    '0'            'Return value'
-unset HAYSTACK
-
-## Matching with '*'
-HAYSTACK='abc'
-matchvar HAYSTACK '*b*' && :; RETVAL="$?"
-is "$HAYSTACK"  'abc'          'Haystack should be unmodified'
-is "$RETVAL"    '0'            'Return value'
-unset HAYSTACK
 
 ########################
 ####  Test ifvar()  ####
