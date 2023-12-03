@@ -1,0 +1,33 @@
+-*- org -*-
+
+* TODO Write README
+* TODO Algorithm description
+* [0/13] Dash program
+   :PROPERTIES:
+   :COOKIE_DATA: todo recursive
+   :END:
+** TODO Rename to use .sh or .dash file suffix
+   So that programs in other programming languages can coexist in the same
+   directory eventually.
+** TODO Use `set -eu`
+** TODO Finish the grammar parsing
+** [0/0] Unit tests
+*** TODO prefix()
+** [0/6] Test suite functions
+*** TODO Make it easier to understand which test failed
+*** TODO Have title string for tests
+    If a test fail, title should be displayed, but not otherwise.
+*** TODO Better test output on failure
+    Diffs are truncated so that e.g. the full error message cannot be seen, fix
+    this.
+*** TODO Use Dashtap for testing(?)
+     `~/fix/fix-github/t/dashtap.sh`
+*** TODO Each test should be a function (test1...N)
+    This to allow random order testing + test can show ID on failure.
+** [0/5] FUTURE MILESTONES
+*** TODO Multiple invocations of parse, building up a grammar?
+*** TODO Allow 'xxx|yyy' (without parentheses) ??
+*** TODO Stop using $IN and $GROUP? (if possible)
+*** TODO Remove dead code
+* [0/0] Perl module
+* [eof]
