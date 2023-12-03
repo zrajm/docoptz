@@ -149,7 +149,7 @@ incvar() {
 # Sets variable VARNAME to 0 if unset, otherwise decrement VARNAME by one.
 decvar() {
     ok_varname "$1" decvar || return 1
-    eval "set -- \"\$1\" \"\$$1\""             # put $VARNAME content in $2
+    eval "set -- \"\$1\" \"\${$1}\""           # put $VARNAME content in $2
     case "$2" in                               # must start with '-' or digit
         ''|-|[!0-9-]*|?*[!0-9]*)               #   only digits after that
             warn "decvar: Invalid number '$2'"
@@ -167,7 +167,7 @@ decvar() {
 # your PATTERN is properly vetted, or better yet, a string literal.)
 matchvar() {
     ok_varname "$1" matchvar || return 10
-    eval "set -- \"\$$1\" \"\$2\""             # put $VARNAME content in $1
+    eval "set -- \"\${$1}\" \"\$2\""           # put $VARNAME content in $1
     eval "case \"\$1\" in ($2) return 0; esac"
     return 1
 }
