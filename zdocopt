@@ -69,7 +69,7 @@ set -e
 # FIXME: Stop using $IN and $GROUP? (if possible)
 # FIXME: Remove dead code
 # FIXME: Use `set -eu`
-# FIXME: Check variable name and add tests for incvar(), decvar() (more?)
+# FIXME: Check variable name and add tests for decvar() (more?)
 
 #DEBUG=1
 DEBUG="${DEBUG:-}"
@@ -134,9 +134,16 @@ setvar() {
 # Usage: incvar VARNAME
 #
 # Sets variable VARNAME to 0 if unset, otherwise increment VARNAME by one.
-# NOTE: If VARNAME contains the name of a variable, then, counter-intutively,
-# that variable is incremented.
-incvar() { eval "$1=\"\$((\${$1:--1} + 1))\""; } #VAR="$((${VAR:--1} + 1))"
+incvar() {
+    ok_varname "$1" incvar || return 1
+    eval "set -- \"\$1\" \"\${$1:--1}\""       # put $VARNAME or '-1' in $2
+    case "$2" in                               # must start with '-' or digit
+        -|[!0-9-]*|?*[!0-9]*)                  #   only digits after that
+            warn "incvar: Invalid number '$2'"
+            return 2
+    esac
+    eval "$1='$(($2 + 1))'"
+}
 
 # Usage: decvar VARNAME
 #
@@ -152,7 +159,7 @@ decvar() { setvar "$1" "$(($1 - 1))"; }
 # your PATTERN is properly vetted, or better yet, a string literal.)
 matchvar() {
     ok_varname "$1" matchvar || return 10
-    eval "set -- \"\$$1\" \"\$2\""             # put content of $VARNAME in $1
+    eval "set -- \"\$$1\" \"\$2\""             # put $VARNAME content in $1
     eval "case \"\$1\" in ($2) return 0; esac"
     return 1
 }
@@ -667,6 +674,99 @@ setvar GOTTED '()' && :; RETVAL="$?"
 is "$GOTTED"       '()'     'Gotted value'
 is "$RETVAL"       '0'      'Return value'
 unset GOTTED
+
+#########################
+####  Test incvar()  ####
+#########################
+## Increment invalid variable name
+tmpfile TMPFILE
+incvar a 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"  '1'           'Return value'
+is "$ERRMSG"  \
+   "$BIN: incvar: Bad variable name 'a'" \
+   'Error message'
+
+## Increment an invalid number
+tmpfile TMPFILE
+VALUE=123abc
+incvar VALUE 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"  '2'           'Return value'
+is "$ERRMSG"  \
+   "$BIN: incvar: Invalid number '123abc'" \
+   'Error message'
+unset VALUE
+
+## Increment '-' (minus sign w/o number)
+tmpfile TMPFILE
+VALUE='-'
+incvar VALUE 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"  '2'           'Return value'
+is "$ERRMSG"  \
+   "$BIN: incvar: Invalid number '-'" \
+   'Error message'
+unset VALUE
+
+## Increment value containing variable name
+tmpfile TMPFILE
+VALUE=VALUE2
+VALUE2=10
+incvar VALUE 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"  '2'           'Return value'
+is "$ERRMSG"  \
+   "$BIN: incvar: Invalid number 'VALUE2'" \
+   'Error message'
+unset VALUE VALUE2
+
+## Increment unset value
+incvar VALUE && :; RETVAL="$?"
+is "$VALUE"        '0'      'Gotted value'
+is "$RETVAL"       '0'      'Return value'
+
+## Increment empty value
+VALUE=''
+incvar VALUE && :; RETVAL="$?"
+is "$VALUE"        '0'      'Gotted value'
+is "$RETVAL"       '0'      'Return value'
+unset VALUE
+
+## Increment number -10
+VALUE=-10
+incvar VALUE && :; RETVAL="$?"
+is "$VALUE"        '-9'     'Gotted value'
+is "$RETVAL"       '0'      'Return value'
+unset VALUE
+
+## Increment number 0
+VALUE=0
+incvar VALUE && :; RETVAL="$?"
+is "$VALUE"        '1'      'Gotted value'
+is "$RETVAL"       '0'      'Return value'
+unset VALUE
+
+## Increment number 1
+VALUE=1
+incvar VALUE && :; RETVAL="$?"
+is "$VALUE"        '2'      'Gotted value'
+is "$RETVAL"       '0'      'Return value'
+unset VALUE
+
+## Increment number 10
+VALUE=10
+incvar VALUE && :; RETVAL="$?"
+is "$VALUE"        '11'     'Gotted value'
+is "$RETVAL"       '0'      'Return value'
+unset VALUE
+
+## Increment number 65536
+VALUE=65536
+incvar VALUE && :; RETVAL="$?"
+is "$VALUE"        '65537'  'Gotted value'
+is "$RETVAL"       '0'      'Return value'
+unset VALUE
 
 ###########################
 ####  Test matchvar()  ####
