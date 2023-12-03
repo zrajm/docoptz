@@ -143,14 +143,17 @@ incvar() { eval "$1=\"\$((\${$1:--1} + 1))\""; } #VAR="$((${VAR:--1} + 1))"
 # Sets variable VARNAME to 0 if unset, otherwise decrement VARNAME by one.
 decvar() { setvar "$1" "$(($1 - 1))"; }
 
-# Usage: match PATTERN STRING
+# Usage: matchvar VARNAME PATTERN
 #
-# Return true if PATTERN was found in STRING, false otherwise. PATTERN is
-# evaluated using a shell case statement. Since PATTERN is inserted into an
-# eval a non-verified PATTERN from a user can be a HUGE security problem, so
-# make sure your PATTERN is properly vetted, or better yet, a string literal.
-match() {
-    eval "case \"\$2\" in ($1) return 0; esac"
+# Return true if the 'case' clause PATTERN matches content of variable VARNAME,
+# false otherwise. Double quotes in PATTERN must be preceded by backslash (i.e.
+# use '\"', not just '"') since PATTERN is eval:ed as-is. (Because of this
+# inserting a PATTERN from a user can be huge security problem, so make sure
+# your PATTERN is properly vetted, or better yet, a string literal.)
+matchvar() {
+    ok_varname "$1" matchvar || return 10
+    eval "set -- \"\$$1\" \"\$2\""             # put content of $VARNAME in $1
+    eval "case \"\$1\" in ($2) return 0; esac"
     return 1
 }
 
@@ -420,7 +423,7 @@ parse() {
                 ## This state only handles if an ellipsis is allowed. Actual
                 ## ellipsis logic runs in the end group state, and ARG state
                 ## where all the needed variables are already set.
-                if [ "$I" = 1 ] || match '["|(["]|...' "$PREV"; then
+                if [ "$I" = 1 ] || matchvar PREV '["|(["]|...'; then
                     warn "Badly placed '...' in rule: $*" \
                          '(Must come after ARGUMENT or end parenthesis/bracket.)'
                     return 1
@@ -664,6 +667,56 @@ setvar GOTTED '()' && :; RETVAL="$?"
 is "$GOTTED"       '()'     'Gotted value'
 is "$RETVAL"       '0'      'Return value'
 unset GOTTED
+
+###########################
+####  Test matchvar()  ####
+###########################
+
+## Failing with invalid haystack variable name
+tmpfile TMPFILE
+matchvar haystack 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"  '10'             'Return value'
+is "$ERRMSG"  \
+   "$BIN: matchvar: Bad variable name 'haystack'" \
+   'Error message'
+
+## Failure with unescaped double quote
+tmpfile TMPFILE
+(matchvar HAYSTACK '"') 2>"$TMPFILE" && :; RETVAL="$?"
+readall ERRMSG <"$TMPFILE"
+is "$RETVAL"    '2'            'Return value'
+is "$ERRMSG"    \
+   "./$BIN: 1: eval: Syntax error: Unterminated quoted string" \
+   'Error message'
+
+## Matching with escaped double quote
+HAYSTACK='"'
+matchvar HAYSTACK '\"' && :; RETVAL="$?"
+is "$HAYSTACK"  '"'            'Haystack should be unmodified'
+is "$RETVAL"    '0'            'Return value'
+unset HAYSTACK
+
+## Matching with 'character class'
+HAYSTACK='x'
+matchvar HAYSTACK '[xyz]' && :; RETVAL="$?"
+is "$HAYSTACK"  'x'            'Haystack should be unmodified'
+is "$RETVAL"    '0'            'Return value'
+unset HAYSTACK
+
+## Matching with negated 'character class'
+HAYSTACK='x'
+matchvar HAYSTACK '[!0-9]' && :; RETVAL="$?"
+is "$HAYSTACK"  'x'            'Haystack should be unmodified'
+is "$RETVAL"    '0'            'Return value'
+unset HAYSTACK
+
+## Matching with '*'
+HAYSTACK='abc'
+matchvar HAYSTACK '*b*' && :; RETVAL="$?"
+is "$HAYSTACK"  'abc'          'Haystack should be unmodified'
+is "$RETVAL"    '0'            'Return value'
+unset HAYSTACK
 
 ########################
 ####  Test ifvar()  ####
