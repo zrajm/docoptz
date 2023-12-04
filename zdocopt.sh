@@ -62,16 +62,6 @@ set -e
 
 # set -euv
 
-# LATER
-# =====
-# FIXME: Each test should be a function (test1...N)
-#        This to allow random order testing + test can show ID on failure.
-# FIXME: Multiple invocations of parse, building up a grammar?
-# FIXME: Allow 'xxx|yyy' (without parentheses) ??
-# FIXME: Stop using $IN and $GROUP? (if possible)
-# FIXME: Remove dead code
-# FIXME: Use `set -eu`
-
 #DEBUG=1
 DEBUG="${DEBUG:-}"
 if [ "$DEBUG" ]; then
