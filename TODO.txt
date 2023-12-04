@@ -1,6 +1,8 @@
 -*- org -*-
 
-* TODO Write README
+* [1/1] Write README
+** DONE License
+   CLOSED: [2023-12-04 Mon 14:23]
 * TODO Algorithm description
 * [1/13] Dash program
    :PROPERTIES:

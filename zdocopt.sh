@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) 2020-2023 zrajm <zdocopt@zrajm.org>
+# Licensed under GNU GPL version 2, see LICENSE-GPL2.txt for details.
 #
 # Usage: pushdownmachine --test
 # Run tests.
