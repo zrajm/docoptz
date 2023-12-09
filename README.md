@@ -1,10 +1,10 @@
-# Zdocopt
+# Docoptz
 
 
 # Tests
 
 In this commit the tests are state of being transitioned away from the
-`zdocopt.sh` source itself into their own test directory (where they will run
+`docoptz.sh` source itself into their own test directory (where they will run
 using [Dashtap]). This is an in-between state where you'll find the tests (in
 the old home-brewed format) in the `t-nontap` directory, and you may run them
 like so:

@@ -1,7 +1,7 @@
 #!/usr/bin/env dash
-# Copyright (C) 2020-2023 zrajm <zdocopt@zrajm.org>
+# Copyright (C) 2020-2023 zrajm <docoptz@zrajm.org>
 # License: GPLv2 [https://gnu.org/licenses/gpl-2.0.txt]
-. "./zdocopt.sh"
+. "./docoptz.sh"
 . "./t/testfunc.sh"
 
 #########################

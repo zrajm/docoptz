@@ -1,26 +1,26 @@
 -*- org -*-
 
 * [1/3] README
-** TODO Describe what zdocopt is
+** TODO Describe what docoptz is
 ** TODO Link to docopt
 ** DONE License
    CLOSED: [2023-12-04 Mon 14:23]
 * TODO Algorithm description
 * [0/5] Test suite
 ** [1/6] Use Dashtap test framework
-*** DONE Remove tests from `zdocopt.sh` source, put in separate directory
+*** DONE Remove tests from `docoptz.sh` source, put in separate directory
     CLOSED: [2023-12-09 Sat 16:33]
-    Right now the tests cases are part of `zdocopt.sh`, but that only works
+    Right now the tests cases are part of `docoptz.sh`, but that only works
     during (part of the) development process. The tests should be put into
     their own separate directory.
-*** TODO No code but functions in `zdocopt.sh`
-    After sourcing `zdocopt.sh` only new functions should be created, nothing
+*** TODO No code but functions in `docoptz.sh`
+    After sourcing `docoptz.sh` only new functions should be created, nothing
     else about the shell environment (or options) should be affected.
-*** TODO Don't use global `set -e` in `zdocopt.sh`
+*** TODO Don't use global `set -e` in `docoptz.sh`
 *** TODO Include Dashtap as submodule
 *** TODO Convert test files to Dashtap format
 *** TODO Update README with relevant test instructions
-** TODO A test case which tests that `. ./zdocopt.sh` loads OK
+** TODO A test case which tests that `. ./docoptz.sh` loads OK
    Also, make sure that the shell options aren't modified during load (e.g.
    `set -e` should not be enabled by during load).
 ** TODO Check in the modified Dashtap into the fix.sh repo, add tests there
@@ -37,7 +37,7 @@
        -----------------------------------------------------------------
 ** TODO Each test should be a function (test1...N)
    This to allow random order testing + test can show ID on failure.
-* [1/8] `docopt.sh`
+* [1/8] `docoptz.sh`
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
    :END:
@@ -55,5 +55,8 @@
    CLOSED: [2023-12-03 Sun 13:29]
    So that programs in other programming languages can coexist in the same
    directory eventually.
-* [0/0] `docopt.pl`
+* [0/0] `docoptz.pl`
+* FINISHED
+** DONE Rename project 'zdocopt' -> 'docoptz'
+   CLOSED: [2023-12-09 Sat 20:35]
 * [eof]
