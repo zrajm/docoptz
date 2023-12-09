@@ -55,24 +55,6 @@
 ##
 ## =============================================================================
 
-# -e -- errexit mode. Interrupt script if any command has exit code >0, unless
-# caught. The tests run with '&& :' which suppresses this for a single command,
-# while still catching the exit value in '$?'.
-set -e
-
-# set -euv
-
-#DEBUG=1
-DEBUG="${DEBUG:-}"
-if [ "$DEBUG" ]; then
-    DEBUG() { {
-        printf '%s\n' "$1"; shift
-        printf '    %s\n' "$@"
-    } >&2; }
-else
-    DEBUG() { :; }
-fi
-
 ################################################################################
 
 out() { printf '%s\n' "$*"; }
