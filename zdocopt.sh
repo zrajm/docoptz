@@ -7,7 +7,7 @@
 #
 
 ## Desired features:
-## * Optional option alguments --color[=WHEN]
+## * Optional option arguments --color[=WHEN]
 ## * Arguments wrapping over multiple lines
 ## * Later: Multiple options lists(?)
 ## * Options defined separately

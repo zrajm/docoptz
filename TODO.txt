@@ -1,28 +1,49 @@
 -*- org -*-
 
-* [1/1] Write README
+* [1/3] README
+** TODO Describe what zdocopt is
+** TODO Link to docopt
 ** DONE License
    CLOSED: [2023-12-04 Mon 14:23]
 * TODO Algorithm description
-* [1/13] Dash program
+* [0/5] Test suite
+** [0/6] Use Dashtap test framework
+*** TODO Remove tests from `zdocopt.sh` source, put in separate directory
+    Right now the tests cases are part of `zdocopt.sh`, but that only works
+    during (part of the) development process. The tests should be put into
+    their own separate directory.
+*** TODO No code but functions in `zdocopt.sh`
+    After sourcing `zdocopt.sh` only new functions should be created, nothing
+    else about the shell environment (or options) should be affected.
+*** TODO Don't use global `set -e` in `zdocopt.sh`
+*** TODO Include Dashtap as submodule
+*** TODO Convert test files to Dashtap format
+*** TODO Update README with relevant test instructions
+** TODO A test case which tests that `. ./zdocopt.sh` loads OK
+   Also, make sure that the shell options aren't modified during load (e.g.
+   `set -e` should not be enabled by during load).
+** TODO Check in the modified Dashtap into the fix.sh repo, add tests there
+** TODO Break out Dashtap into its own repository, include as submodule
+** TODO Dashtap needs to be resilient when shell globals are set
+   `set -e` fucked up the `is` output on failure, making it output
+       -----------------------------------------------------------------
+       t/shell-globals.t: 637: return: Illegal number:  e
+       -----------------------------------------------------------------
+
+   Rather than the expected:
+       -----------------------------------------------------------------
+       Failed test '...'
+       -----------------------------------------------------------------
+** TODO Each test should be a function (test1...N)
+   This to allow random order testing + test can show ID on failure.
+* [1/8] `docopt.sh`
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
    :END:
+** [0/1] TESTS
+*** TODO Add tests for prefix() function
 ** TODO Use `set -eu`
 ** TODO Finish the grammar parsing
-** [0/0] Unit tests
-*** TODO prefix()
-** [0/6] Test suite functions
-*** TODO Make it easier to understand which test failed
-*** TODO Have title string for tests
-    If a test fail, title should be displayed, but not otherwise.
-*** TODO Better test output on failure
-    Diffs are truncated so that e.g. the full error message cannot be seen, fix
-    this.
-*** TODO Use Dashtap for testing(?)
-     `~/fix/fix-github/t/dashtap.sh`
-*** TODO Each test should be a function (test1...N)
-    This to allow random order testing + test can show ID on failure.
 ** [0/5] FUTURE MILESTONES
 *** TODO Multiple invocations of parse, building up a grammar?
 *** TODO Allow 'xxx|yyy' (without parentheses) ??
@@ -33,5 +54,5 @@
    CLOSED: [2023-12-03 Sun 13:29]
    So that programs in other programming languages can coexist in the same
    directory eventually.
-* [0/0] Perl module
+* [0/0] `docopt.pl`
 * [eof]
