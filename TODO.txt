@@ -7,8 +7,9 @@
    CLOSED: [2023-12-04 Mon 14:23]
 * TODO Algorithm description
 * [0/5] Test suite
-** [0/6] Use Dashtap test framework
-*** TODO Remove tests from `zdocopt.sh` source, put in separate directory
+** [1/6] Use Dashtap test framework
+*** DONE Remove tests from `zdocopt.sh` source, put in separate directory
+    CLOSED: [2023-12-09 Sat 16:33]
     Right now the tests cases are part of `zdocopt.sh`, but that only works
     during (part of the) development process. The tests should be put into
     their own separate directory.
