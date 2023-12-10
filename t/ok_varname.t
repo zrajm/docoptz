@@ -1,38 +1,35 @@
 #!/usr/bin/env dash
 # Copyright (C) 2020-2023 zrajm <docoptz@zrajm.org>
 # License: GPLv2 [https://gnu.org/licenses/gpl-2.0.txt]
-set -e
-
+. "./dashtap/dashtap.sh"
 . "./docoptz.sh"
-. "./t/testfunc.sh"
 
-#############################
-####  Test ok_varname()  ####
-#############################
-## Varname may not be empty
-tmpfile TMPFILE
-ok_varname '' 2>"$TMPFILE" && :; RETVAL="$?"
-readall ERRMSG <"$TMPFILE"
-is "$RETVAL"  '1'                                     'Return value'
-is "$ERRMSG"  "$BIN: Bad variable name ''"            'Error message'
+cat() { stdin <"$1"; }
+BIN="${0##*/}"
 
-## Varname may not start with digit
-tmpfile TMPFILE
-ok_varname 0ABC 2>"$TMPFILE" && :; RETVAL="$?"
-readall ERRMSG <"$TMPFILE"
-is "$RETVAL"  '1'                                     'Return value'
-is "$ERRMSG"  "$BIN: Bad variable name '0ABC'"        'Error message'
+function_exists ok_varname "Function 'ok_varname' exists"
 
-## Varname may not contain lower case
-tmpfile TMPFILE
-ok_varname ABCx test 2>"$TMPFILE" && :; RETVAL="$?"
-readall ERRMSG <"$TMPFILE"
-is "$RETVAL"  '1'                                     'Return value'
-is "$ERRMSG"  "$BIN: test: Bad variable name 'ABCx'"  'Error message'
+cd "$(mktemp -d)"
+title "ok_varname: Varname may not be empty"
+ok_varname '' 2>stderr && :; RETVAL="$?"
+is "$RETVAL"       '1'                                    'Return value'
+is "$(cat stderr)" "$BIN: Bad variable name ''"           'Error message'
 
-## Varname may start with/contain '_'
+cd "$(mktemp -d)"
+title "ok_varname: Varname may not start with digit"
+ok_varname 0ABC 2>stderr && :; RETVAL="$?"
+is "$RETVAL"       '1'                                    'Return value'
+is "$(cat stderr)" "$BIN: Bad variable name '0ABC'"       'Error message'
+
+cd "$(mktemp -d)"
+title "ok_varname: Varname may not contain lower case"
+ok_varname ABCx test 2>stderr && :; RETVAL="$?"
+is "$RETVAL"       '1'                                    'Return value'
+is "$(cat stderr)" "$BIN: test: Bad variable name 'ABCx'" 'Error message'
+
+title "ok_varname: Varname may start with/contain '_'"
 ok_varname _ABC && :; RETVAL="$?"
-is "$RETVAL"  '0'                                     'Return value'
+is "$RETVAL"       '0'                                    'Return value'
 
 done_testing
 #[eof]

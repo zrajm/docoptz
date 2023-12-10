@@ -1,121 +1,113 @@
 #!/usr/bin/env dash
 # Copyright (C) 2020-2023 zrajm <docoptz@zrajm.org>
 # License: GPLv2 [https://gnu.org/licenses/gpl-2.0.txt]
-set -e
-
+. "./dashtap/dashtap.sh"
 . "./docoptz.sh"
-. "./t/testfunc.sh"
 
-############################
-#####  Test readdoc()  #####
-############################
-## Call with missing input on STDIN
-tmpfile TMPFILE
-readdoc 2>"$TMPFILE" && :; RETVAL="$?"
-readall ERRMSG <"$TMPFILE"
+cat() { stdin <"$1"; }
+BIN="${0##*/}"
+
+function_exists readdoc "Function 'readdoc' exists"
+
+cd "$(mktemp -d)"
+title "readdoc: Call with missing input on STDIN"
+readdoc 2>stderr && :; RETVAL="$?"
 is "$RETVAL"  '1'                                      'Return value'
-is "$ERRMSG"  "$BIN: readdoc: Missing input on STDIN"  'Error message'
+is "$(cat stderr)"  "$BIN: readdoc: Missing input on STDIN"  'Error message'
 unset ERRMSG TMPFILE
 
-## Call with missing argument
-tmpfile TMPFILE
-readdoc 2>"$TMPFILE" <&- && :; RETVAL="$?"
-readall ERRMSG <"$TMPFILE"
+cd "$(mktemp -d)"
+title "readdoc: Call with missing argument"
+readdoc 2>stderr <&- && :; RETVAL="$?"
 is "$RETVAL"  '1'                                      'Return value'
-is "$ERRMSG"  "$BIN: readdoc: Bad variable name ''"    'Error message'
+is "$(cat stderr)"  "$BIN: readdoc: Bad variable name ''"    'Error message'
 unset ERRMSG TMPFILE
 
-## Content with only docstring
+cd "$(mktemp -d)"
+title "readdoc: Content with only docstring"
 DOC="comment string"
-tmpfile TMPFILE
-readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+readdoc GOTTED_DOC 2>stderr <<'EOF' && :; RETVAL="$?"
 # comment string
 EOF
-readall ERRMSG <"$TMPFILE"
 is "$RETVAL"       '0'              'Return value'
-is "$ERRMSG"       ''               'Error message'
+is "$(cat stderr)" ''               'Error message'
 is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
 unset DOC ERRMSG GOTTED_DOC TMPFILE
 
-## Docstring ending in newline
+cd "$(mktemp -d)"
+title "readdoc: Docstring ending in newline"
 DOC="comment string"
-tmpfile TMPFILE
-readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+readdoc GOTTED_DOC 2>stderr <<'EOF' && :; RETVAL="$?"
 # comment string
 
 EOF
-readall ERRMSG <"$TMPFILE"
 is "$RETVAL"       '0'              'Return value'
-is "$ERRMSG"       ''               'Error message'
+is "$(cat stderr)" ''               'Error message'
 is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
 unset DOC ERRMSG GOTTED_DOC TMPFILE
 
-## Docstring ending with shell command
+cd "$(mktemp -d)"
+title "readdoc: Docstring ending with shell command"
 DOC="comment string"
-tmpfile TMPFILE
-readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+readdoc GOTTED_DOC 2>stderr <<'EOF' && :; RETVAL="$?"
 # comment string
 shell-command
 EOF
-readall ERRMSG <"$TMPFILE"
 is "$RETVAL"       '0'              'Return value'
-is "$ERRMSG"       ''               'Error message'
+is "$(cat stderr)" ''               'Error message'
 is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
 unset DOC ERRMSG GOTTED_DOC TMPFILE
 
-## Ignore shebang(s) in docstring
+cd "$(mktemp -d)"
+title "readdoc: Ignore shebang(s) in docstring"
 DOC="comment string"
-tmpfile TMPFILE
-readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+readdoc GOTTED_DOC 2>stderr <<'EOF' && :; RETVAL="$?"
 #!/she/bang
 # comment string
 #! a docstring 'comment'
 EOF
-readall ERRMSG <"$TMPFILE"
 is "$RETVAL"       '0'              'Return value'
-is "$ERRMSG"       ''               'Error message'
+is "$(cat stderr)" ''               'Error message'
 is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
 unset DOC ERRMSG GOTTED_DOC TMPFILE
 
-## Some text/commands before docstr
+cd "$(mktemp -d)"
+title "readdoc: Some text/commands before docstr"
 DOC="comment string
 comment string"
-tmpfile TMPFILE
-readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+readdoc GOTTED_DOC 2>stderr <<'EOF' && :; RETVAL="$?"
 #!/she/bang
 shell-command(s)
 # comment string
 # comment string
 EOF
-readall ERRMSG <"$TMPFILE"
 is "$RETVAL"       '0'              'Return value'
-is "$ERRMSG"       ''               'Error message'
+is "$(cat stderr)" ''               'Error message'
 is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
 unset DOC ERRMSG GOTTED_DOC TMPFILE
 
-## Only get first comment block, ignore subsequent ones
+cd "$(mktemp -d)"
+title "readdoc: Only get first comment block, ignore subsequent ones"
 DOC="comment string"
-tmpfile TMPFILE
-readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+readdoc GOTTED_DOC 2>stderr <<'EOF' && :; RETVAL="$?"
 #!/she/bang
 shell-command
 # comment string
 
 # comment string
 EOF
-readall ERRMSG <"$TMPFILE"
 is "$RETVAL"       '0'              'Return value'
-is "$ERRMSG"       ''               'Error message'
+is "$(cat stderr)" ''               'Error message'
 is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
 unset DOC ERRMSG GOTTED_DOC TMPFILE
 
-## Comment may contain blank lines (except at beginning)
+cd "$(mktemp -d)"
+title "readdoc: Comment may contain blank lines (except at beginning)"
 DOC="comment string
 
 comment string
 "
-tmpfile TMPFILE
-readdoc GOTTED_DOC 2>"$TMPFILE" <<'EOF' && :; RETVAL="$?"
+readdoc GOTTED_DOC 2>stderr <<'EOF' && :; RETVAL="$?"
 #!/she/bang
 shell-command
 # comment string
@@ -123,9 +115,8 @@ shell-command
 # comment string
 #
 EOF
-readall ERRMSG <"$TMPFILE"
 is "$RETVAL"       '0'              'Return value'
-is "$ERRMSG"       ''               'Error message'
+is "$(cat stderr)" ''               'Error message'
 is "$GOTTED_DOC"   "$DOC"           'Docstr: $DOC'
 unset DOC ERRMSG GOTTED_DOC TMPFILE
 

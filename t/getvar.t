@@ -1,26 +1,27 @@
 #!/usr/bin/env dash
 # Copyright (C) 2020-2023 zrajm <docoptz@zrajm.org>
 # License: GPLv2 [https://gnu.org/licenses/gpl-2.0.txt]
-set -e
-
+. "./dashtap/dashtap.sh"
 . "./docoptz.sh"
-. "./t/testfunc.sh"
 
-#########################
-####  Test getvar()  ####
-#########################
-tmpfile TMPFILE
-getvar a 2>"$TMPFILE" && :; RETVAL="$?"
-readall ERRMSG <"$TMPFILE"
+cat() { stdin <"$1"; }
+BIN="${0##*/}"
+
+function_exists getvar "Function 'getvar' exists"
+
+cd "$(mktemp -d)"
+title "getvar: Invalid variable name as 1st arg"
+getvar a 2>stderr && :; RETVAL="$?"
 is "$RETVAL"  '1'                                   'Return value'
-is "$ERRMSG"  "$BIN: getvar: Bad variable name 'a'" 'Error message'
+is "$(cat stderr)"  "$BIN: getvar: Bad variable name 'a'" 'Error message'
 
-tmpfile TMPFILE
-getvar A b 2>"$TMPFILE" && :; RETVAL="$?"
-readall ERRMSG <"$TMPFILE"
+cd "$(mktemp -d)"
+title "getvar: Invalid variable name as 2nd arg"
+getvar A b 2>stderr && :; RETVAL="$?"
 is "$RETVAL"  '1'                                   'Return value'
-is "$ERRMSG"  "$BIN: getvar: Bad variable name 'b'" 'Error message'
+is "$(cat stderr)"  "$BIN: getvar: Bad variable name 'b'" 'Error message'
 
+title "getvar: Get value containing '()'"
 VAL="()"
 getvar GOTTED VAL && :; RETVAL="$?"
 is "$GOTTED"       '()'     'Gotted value'

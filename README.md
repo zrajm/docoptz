@@ -1,15 +1,40 @@
 # Docoptz
 
 
+# Installing & Updating
+
+Docoptz uses the Dashtap test framework which is included as a Git submodule,
+so if you want to run the tests, you'll need to clone the submodules as well:
+
+    git clone --recurse-submodules git@github.com:zrajm/docoptz.git
+
+The same goes for when you're pulling the latest changes:
+
+    git pull --recurse-submodules
+
+NOTE: If a submodule is in a 'detach HEAD' state (using Git v2.34.1) when you
+invoke `git pull --recurse-submodules`, the submodule will remain in detached
+HEAD state, but in the main repository `git status` will report that the
+submodule as unmodified. :(
+
+The following command will output the names of all submodules that are in a
+detached HEAD state:
+
+    git submodule -q foreach 'git symbolic-ref -q HEAD || echo "$sm_path"'
+
+
 # Tests
 
-In this commit the tests are state of being transitioned away from the
-`docoptz.sh` source itself into their own test directory (where they will run
-using [Dashtap]). This is an in-between state where you'll find the tests (in
-the old home-brewed format) in the `t-nontap` directory, and you may run them
-like so:
+The Docoptz test suite (found in the directory `t/`) can be run using:
 
-    for FILE in t/*.t; do echo "$FILE"; dash "$FILE"; done
+    prove
+
+Docoptz comes with a test suite written using the small [Dashtap] testing
+framework. It is written using the [Dash] shell and uses the [TAP] (*Test
+Anything Protocol*) output format. The small Dash shell file size and fast
+execution format help deliver fast testing, while the TAP protocol allow you to
+use any testing tool build for TAP (e.g. the `prove` command used above that
+comes with Perl).
 
 
 # License
@@ -25,5 +50,6 @@ ShareAlike version 4.0 International ([CC-BY-SA-4.0]).
 [Dash]: http://gondor.apana.org.au/~herbert/dash "Debian Almquist SHell"
 [Dashtap]: //github.com/zrajm/dashtap "Dashtap Testing Framework"
 [GPL-2.0]: LICENSE-GPL2.txt
+[TAP]: //testanything.org "Test Anything Protocol"
 
 <!--[eof]-->

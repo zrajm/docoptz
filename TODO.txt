@@ -7,7 +7,7 @@
    CLOSED: [2023-12-04 Mon 14:23]
 * TODO Algorithm description
 * [0/6] Test suite
-** [3/6] Use Dashtap test framework
+** [6/9] Use Dashtap test framework
 *** DONE Remove tests from `docoptz.sh` source, put in separate directory
     CLOSED: [2023-12-09 Sat 16:33]
     Right now the tests cases are part of `docoptz.sh`, but that only works
@@ -20,9 +20,21 @@
 *** DONE Don't use global `set -e` in `docoptz.sh`
     CLOSED: [2023-12-09 Sat 21:21]
     Instead added `set -e` to all tests.
-*** TODO Include Dashtap as submodule
-*** TODO Convert test files to Dashtap format
-*** TODO Update README with relevant test instructions
+*** DONE Include Dashtap as submodule
+    CLOSED: [2023-12-10 Sun 02:34]
+*** [3/3] Convert test files to Dashtap format
+**** DONE Verify that 'function_exists' has right func name in each test file
+     CLOSED: [2023-12-10 Sun 18:03]
+**** DONE Title should have double quoted arg "..." (not '...')
+     CLOSED: [2023-12-10 Sun 20:23]
+**** DONE Make sure each `dumpenv` tests creates a tempdir
+     CLOSED: [2023-12-10 Sun 20:23]
+*** DONE Update README with relevant test instructions
+    CLOSED: [2023-12-10 Sun 20:33]
+*** DONE Update README with how to use submodules (for Dashtap)
+    CLOSED: [2023-12-10 Sun 20:37]
+*** TODO Rename variable 'RETVAL' -> 'RC' in test cases
+*** TODO Unset 'RC' after it's been used in each test case
 ** TODO Test cases making sure that `set -e` works
 ** TODO Test cases making sure that `set -u` works
 ** TODO A test case which tests that `. ./docoptz.sh` loads OK
