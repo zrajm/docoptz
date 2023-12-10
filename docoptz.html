@@ -1,0 +1,1097 @@
+<!doctype html><!--*-ispell-dictionary:"en";js-indent-level:2;css-indent-offset:2-*-->
+<style>
+  @media (prefers-color-scheme: dark) {
+    html { background: #000; color: #fff;}
+    html:after {
+      position: absolute; top: 0; right: 0;
+      content: 'Dark mode';
+      padding: .25rem .5rem;
+      opacity: .5;
+    }
+  }
+  dt:target + dd, :target {
+    background: #aaf;
+    box-shadow: 0 0 0 4px #aaf;
+    border-radius: 1px;
+  }
+  html {
+    --rem: 18px;
+    --line-height: 1.5;
+    --padding-vert: .25em;
+    --padding-horiz: .5em;
+    --label-height: calc(var(--rem) * var(--line-height) + ( var(--padding-vert) * 2 ) );
+    --gray-background: #aaa7;
+    font-size: var(--rem);
+    line-height: var(--line-height);
+  }
+  a[href^="#"], dt {
+    margin-top: var(--padding-vert);
+    font-style: italic;
+  }
+  tt, pre, .pseudo {
+    background: var(--gray-background);
+    padding: 0px 2px;
+    border-radius: 4px;
+  }
+  .pseudo div {
+    padding-left: 2em;
+  }
+  pre {
+    padding:
+      var(--padding-vert)
+      var(--padding-horiz);
+  }
+  div.wrap {
+    display: flex;
+    flex-direction: row;
+    gap: 1em;
+    overflow-x: scroll;
+    border: 1px solid #000;
+    padding: 1em .25em;
+
+    counter-reset: iteration;
+  }
+  div.iteration {
+    border: 1px solid #000;
+    border-radius: .5em;
+    position: relative;
+    padding-top: calc(var(--label-height))
+  }
+  div.input, div.code {
+    font-family: mono;
+    padding:
+      var(--padding-vert)
+      var(--padding-horiz);
+    white-space: nowrap;
+  }
+  div.input.a {
+    background: #ff08;
+  }
+  div.input.b {
+    background: #f808;
+  }
+  div.input:before, div.input:before {
+    content: attr(label);
+    background: var(--gray-background);
+    float: right;
+    font-family: serif;
+  }
+  div.iteration::before {
+    display: block;
+    font-weight: bold;
+    background: #00f4;
+    position: absolute;
+    top: 0; left: 0; right: 0; height: : var(--label-height);
+    border-top-left-radius: inherit;
+    border-top-right-radius: inherit;
+    padding: var(--padding-vert) var(--padding-horiz);
+
+    counter-increment: iteration;
+    content: "Iteration " counter(iteration);
+  }
+  details {
+    box-shadow: 2px 2px 5px #0008; border-radius: 5px;
+    padding: .5rem .25rem;
+    --open:   '▽'; /* ▼ */
+    --closed: '▷'; /* ▶ */
+    & summary {
+      list-style-type: none;
+      cursor: pointer;
+      &:before {
+        position: relative; bottom: .125rem;
+        margin: 0 .375rem 0 .375rem;
+        content: var(--closed);
+      }
+    }
+    &[open] > summary {
+      margin-bottom: 0.5rem;
+      &:before { content: var(--open) }
+    }
+  }
+</style>
+
+<h1 id=top>The Docoptz Algorithm for the Dash Shell</h1>
+
+<h2 id=syntax>Docopt syntax</h2>
+
+<p>A grammar consist of zero or more rules (zero rules matches only an empty
+command line). – Each rule consist of one or more <i>symbols</i>, which can be
+either <a href="#syntactic">syntactic</a> (defining the structure of the
+grammar) or <a href="#consuming">consuming</a> (gobbling up, and possibly
+matching against, an argument from the command line).
+
+<p>A symbol may be either:
+
+<ul>
+  <li>a <i>literal</i> – which matches only if there's an identical argument on
+    the command line (e.g. <tt>--option</tt>, <tt>subcommand</tt> or <tt>=</tt>
+    between an option and its argument)
+  <li>a <i>nonliteral</i> – which matches an argument on command line
+    (e.g. <tt>ARG</tt>)
+  <li>a <i>grouping</i> – which is done with <tt>(…|…)</tt> and <tt>[…|…]</tt>
+    (<tt>|</tt> separates <i>alternatives</i> in a group).
+</ul>
+
+<p>Variables are <tt>GRAMMAR</tt>, and <tt>ARGS</tt>. Algorithm goes
+through <tt>GRAMMAR</tt> and whenever it finds a grammar symbol that requires
+an <tt>ARGUMENT</tt> it reads one argument from <tt>ARGS</tt>, sets the
+corresponding environment variable for that argument, then continues on. If the
+end of a <tt>GRAMMAR</tt> rules is reached, and all <tt>ARGS</tt> args have
+been read, then return true, otherwise return false and output the first
+encountered error to standard error.
+
+<p>Now there are a few complications to the above, namely that <tt>GRAMMAR</tt>
+consists of rules in parentheses (with possible subparentheses) and we must
+keep track of this, unsetting the options for any subrule that fail to match
+(so as to only report back any actually working options).
+
+
+<div class=pseudo>
+  SKIPSTACK – stack for keeping track of skipped symbols in parens
+  <br>paren-done = true if paren has been parse okay (= skip remaining)
+  <br>paren-error = msg if failed on subexpression (=skip subexpression)
+  <br>
+  <br>SYMBOL: For each <i>symbol</i>
+  <div>
+    On <tt>(</tt> or <tt>[</tt>
+    <div>
+      if (paren-done OR paren-error) { push to SKIPSTACK; next SYMBOL }
+      <br>…
+    </div>
+    On <tt>|</tt>
+    <div>
+      if (paren-done) { next SYMBOL }
+      <br>…
+    </div>
+    On <tt>)</tt> or <tt>]</tt>
+    <div>
+      if (paren-done OR paren-error) { pop from SKIPSTACK; next SYMBOL }
+      <br>…
+    </div>
+    On <tt>...</tt>
+    <div>
+      if (paren-done OR paren-error) { next SYMBOL }
+      <br>…
+    </div>
+  </div>
+  <hr>
+  <br>SYMBOL: For each <i>rule-symbol</i>
+  <div>
+    On <tt>(</tt> OR <tt>[</tt>: <div>push to skipstack</div>
+    if skipstack: next SYMBOL
+
+    <br><br>if paren-done OR paren-error
+    <div>
+      On <tt>(</tt> OR <tt>[</tt>: <div>push to SKIPSTACK</div>
+      On <tt>)</tt> OR <tt>]</tt>: <div>pop from SKIPSTACK</div>
+      if (!<tt>|</tt> OR paren-done)
+      <div>
+        next SYMBOL
+      </div>
+    </div>
+
+
+    <br>On <tt>(</tt> or <tt>[</tt>
+    <div>
+      if (paren-done OR paren-error) { push to SKIPSTACK; next SYMBOL }
+      <br>…
+    </div>
+    On <tt>|</tt>
+    <div>
+      if (paren-done) { next SYMBOL }
+      <br>…
+    </div>
+    On <tt>)</tt> or <tt>]</tt>
+    <div>
+      if (paren-done OR paren-error) { pop from SKIPSTACK; next SYMBOL }
+      <br>…
+    </div>
+    On <tt>...</tt>
+    <div>
+      if (paren-done OR paren-error) { next SYMBOL }
+      <br>…
+    </div>
+  </div>
+</div>
+
+<pre>
+DEPTH=0      # how deep into parens are we?
+COUNT=1      # which iteration of the current paren are we on?
+COUNT_0=1    # (0 = $DEPTH)
+</pre>
+
+<details>
+  <summary>Code</summary>
+  <div class=iteration>
+    <div class="input a" label=grammar>'shoot [weapon TYPE]... NAME'</div>
+    <div class="input b" label=args>'shoot weapon arrow weapon bola eagle'</div>
+    <div class=code>
+      <br># Grammar + args literals match, shift & set.
+      <br>OPT_shoot='shoot'
+      <br>VARS_0+="OPT_shoot"           (0 = $DEPTH)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'[weapon TYPE]... NAME'</div>
+    <div class="input b" label=args>'weapon arrow weapon bola eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br># Grammar has '(' or '[', increase depth, init counter, and append any
+      <br># previously existing subgrammar at this depth to the subgrammar above, then
+      <br># add paren to the current subgrammar depth.
+      <br>DEPTH++                       ($DEPTH is 1)
+      <br>COUNT=1                       ($COUNT is 1)
+      <br>COUNT_1=COUNT                 (1 = $DEPTH)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'weapon TYPE]... NAME'</div>
+    <div class="input b" label=args>'weapon arrow weapon bola eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br>subgram1:       '['
+      <br># Grammar + args literals match, shift & set.
+      <br>OPT_weapon_1='weapon'         (1 = $COUNT)
+      <br>VARS_1+="OPT_weapon_1"        (1 = $DEPTH)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'TYPE]... NAME'</div>
+    <div class="input b" label=args>'arrow weapon bola eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br>subgram1:       '[weapon'
+      <br># Grammar + args options match, shift & set.
+      <br>OPT_TYPE_1='arrow'            (1 = $COUNT)
+      <br>VARS_1+="OPT_TYPE_1"          (1 = $DEPTH)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>']... NAME'</div>
+    <div class="input b" label=args>'weapon bola eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br>subgram1:       '[weapon TYPE'
+      <br># Reached ')' or ']' in grammar without error (possibly skipping past some
+      <br># alternatives), move grammar symbol to subgrammar, then decrease depth.
+      <br>DEPTH--                       ($DEPTH is 0)
+      <br>COUNT=COUNT_0                 (0 = $DEPTH)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'... NAME'</div>
+    <div class="input b" label=args>'weapon bola eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br>subgram1:       '[weapon TYPE]'
+      <br># Grammar has '...', prepend subgrammar from DEPTH+1 without opening bracket.
+      <br>DEPTH++                       ($DEPTH is 1)
+      <br>COUNT=COUNT_1                 (1 = $DEPTH)
+      <br>COUNT++                       ($COUNT is 2)
+      <br>COUNT_1=COUNT                 (1 = $DEPTH)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'weapon TYPE]... NAME'</div>
+    <div class="input b" label=args>'weapon bola eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br>subgram1:       '['
+      <br># Grammar + args literals match, shift & set.
+      <br>OPT_weapon_2='weapon'         (2 = $COUNT)
+      <br>VARS_1+="OPT_weapon_2"        (1 = $DEPTH)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'TYPE]... NAME'</div>
+    <div class="input b" label=args>'bola eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br>subgram1:       '[weapon'
+      <br># Grammar + args options match, shift & set.
+      <br>OPT_TYPE_2='bola'             (2 = $COUNT)
+      <br>VARS_1+="OPT_TYPE_2"          (1 = $DEPTH)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>']... NAME'</div>
+    <div class="input b" label=args>'eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br>subgram1:       '[weapon TYPE'
+      <br># Reached ')' or ']' in grammar without error (possibly skipping past some
+      <br># alternatives), move grammar symbol to subgrammar, then decrease depth.
+      <br>DEPTH--                       ($DEPTH is 0)
+      <br>COUNT=COUNT_0                 (0 = $DEPTH)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'... NAME'</div>
+    <div class="input b" label=args>'eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br>subgram1:       '[weapon TYPE]'
+      <br># Grammar has '...', prepend subgrammar from DEPTH+1 without opening bracket.
+      <br>DEPTH++                       ($DEPTH is 1)
+      <br>COUNT=COUNT_1                 (1 = $DEPTH)
+      <br>COUNT++                       ($COUNT is 3)
+      <br>COUNT_1=COUNT                 (1 = $DEPTH)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'weapon TYPE]... NAME'</div>
+    <div class="input b" label=args>'eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br>subgram1:       '['
+      <br># Grammar + args literals DO NOT match, set ERR (which will skip to the next
+      <br># alternative [if any] in this parenthesis).
+      <br>ERR="Unknown argument 'eagle' after subcommand 'shoot'"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'TYPE]... NAME'</div>
+    <div class="input b" label=args>'eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br>subgram1:       '[weapon'
+      <br># ERR is set, so everything is ignored until we reach matching '|', ')' or ']'.
+      <br># Just move current symbol from grammar to subgrammar.
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>']... NAME'</div>
+    <div class="input b" label=args>'eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br>subgram1:       '[weapon TYPE'
+      <br># Reached ')' or ']' but ERR is set, move grammar symbol to subgrammar, then
+      <br># decrease depth. For brackets, set I to beginning of brackets but don't count
+      <br># it as a failure. For parens, ERR is set, it is a failure. On failure, erase
+      <br># vars in `VARS_$DEPTH` (then `VARS_$DEPTH` itself).
+      <br>DEPTH--                       ($DEPTH is 0)
+      <br>COUNT=COUNT_0
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'... NAME'</div>
+    <div class="input b" label=args>'eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot'
+      <br>subgram1:       '[weapon TYPE]'
+      <br># Grammar has '...', but previous paren failed (so there's no point running it
+      <br># again), so prepend subgrammar from DEPTH+1 to subgrammar of current DEPTH,
+      <br># and move grammar symbol there too.
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'NAME'</div>
+    <div class="input b" label=args>'eagle'</div>
+    <div class=code>
+      <br>subgram0: 'shoot [weapon TYPE]...'
+      <br># Grammar has '...', but previous paren failed (so there's no point running it
+      <br># again), so prepend subgrammar from DEPTH+1 to subgrammar of current DEPTH,
+      <br># and move grammar symbol there too.
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'NAME'</div>
+    <div class="input b" label=args>'eagle'</div>
+    <div class=code>
+      <br># Grammar + args options match, shift & set.
+      <br>OPT_NAME='eagle'
+      <br>VARS_$DEPTH+="OPT_NAME"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>''</div>
+    <div class="input b" label=args>''</div>
+    <div class=code>
+      <br># Grammar + args are empty == SUCCESS!!
+    </div>
+  </div>
+</details>
+
+<hr>
+
+<pre>
+  COUNT=0   # which iteration of the current paren are we on?
+  DEPTH=0   # how deep into parens are we?
+</pre>
+
+<details>
+  <summary>Code</summary>
+  <div class=iteration>
+    <div class="input a" label=grammar>'((fish|hunt) (today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'hunt today tomorrow fish tomorrow'</div>
+    <div class=code>
+      # Grammar has '(' or '[', increase depth, init counter, and append any
+      # previously existing subgrammar at this depth to the subgrammar above, then
+      # add paren to the current subgrammar depth.
+      DEPTH++               ($DEPTH is 1)
+      COUNT=1
+      COUNT_$DEPTH="$COUNT"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'(fish|hunt) (today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'hunt today tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      # Grammar has '(' or '[', increase depth, init counter, and append any
+      # previously existing subgrammar at this depth to the subgrammar above, then
+      # add paren to the current subgrammar depth.
+      DEPTH++               ($DEPTH is 2)
+      COUNT=1
+      COUNT_$DEPTH="$COUNT"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'fish|hunt) (today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'hunt today tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '('
+      # Grammar + args literals DO NOT match, set ERR (which will skip to the next
+      # alternative [if any] in this parenthesis).
+      ERR="Unknown subcommand 'hunt'"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'hunt) (today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'hunt today tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '(fish|'
+      # Grammar + args literals match, move to subgrammar, shift & set.
+      OPT_hunt_$COUNT='hunt'       ($COUNT is 1)
+      VARS_$DEPTH+="OPT_hunt_$COUNT"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>') (today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'today tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '(fish|hunt'
+      # Reached ')' or ']' in grammar without error (possibly skipping past some
+      # alternatives), move grammar symbol to subgrammar, then decrease depth.
+      DEPTH--               ($DEPTH is 1)
+      COUNT=COUNT_$DEPTH
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'(today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'today tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '(fish|hunt)'
+      # Grammar has '(' or '[', increase depth, init counter, and append any
+      # previously existing subgrammar at this depth to the subgrammar above, then
+      # add paren to the current subgrammar depth.
+      DEPTH++               ($DEPTH is 2)
+      COUNT=1
+      COUNT_$DEPTH="$COUNT"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'today tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)'
+      subgram2:              '('
+      # Grammar + args literals match, move to subgrammar, shift & set.
+      OPT_today_$COUNT='today'    ($COUNT is 1)
+      VARS_$DEPTH+="OPT_today_$COUNT"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'|tomorrow)...)...'</div>
+    <div class="input b" label=args>'tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)'
+      subgram2:              '(today'
+      # Reached '|' in grammar without error, skip all other alternatives in paren by
+      # setting PARENDONE.
+      PARENDONE=1
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'|tomorrow)...)...'</div>
+    <div class="input b" label=args>'tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)'
+      subgram2:              '(today'
+      # PARENDONE is set, so just move grammar symmol to subgrammar until we reach
+      # ')' or ']'.
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'tomorrow)...)...'</div>
+    <div class="input b" label=args>'tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)'
+      subgram2:              '(today|'
+      # PARENDONE is set, so just move grammar symmol to subgrammar until we reach
+      # ')' or ']'.
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>')...)...'</div>
+    <div class="input b" label=args>'tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)'
+      subgram2:              '(today|tomorrow'
+      # Reached ')' or ']' in grammar without error (possibly skipping past some
+      # alternatives), move grammar symbol to subgrammar, then decrease depth.
+      PARENDONE=''
+      DEPTH--                       ($DEPTH is 0)
+      COUNT=COUNT_$DEPTH
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'...)...'</div>
+    <div class="input b" label=args>'tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)
+      subgram2:              '(today|tomorrow)'
+      # Grammar has '...', prepend subgrammar from DEPTH+1 without opening bracket.
+      DEPTH++                      ($DEPTH is 3)
+      COUNT=$COUNT_$DEPTH++        ($COUNT is 2)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)
+      subgram2:              '('
+      # Grammar + args literals DO NOT match, set ERR (which will skip to the next
+      # alternative [if any] in this parenthesis).
+      ERR="Unknown argument 'tomorrow' after subcommand 'hunt'"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'tomorrow)...)...'</div>
+    <div class="input b" label=args>'tomorrow fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)
+      subgram2:              '(today|'
+      # Grammar + args literals match, move to subgrammar, shift & set.
+      OPT_tomorrow_$COUNT='tomorrow'  ($COUNT is 2)
+      VARS_$DEPTH+="OPT_tomorrow_$COUNT"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>')...)...'</div>
+    <div class="input b" label=args>'fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)
+      subgram2:              '(today|tomorrow'
+      # Reached ')' or ']' in grammar without error (possibly skipping past some
+      # alternatives), move grammar symbol to subgrammar, then decrease depth.
+      PARENDONE=''
+      DEPTH--                       ($DEPTH is 0)
+      COUNT=COUNT_$DEPTH
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'...)...'</div>
+    <div class="input b" label=args>'fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)
+      subgram2:              '(today|tomorrow)'
+      # Grammar has '...', prepend subgrammar from DEPTH+1 without opening bracket.
+      DEPTH++                      ($DEPTH is 3)
+      COUNT=$COUNT_$DEPTH++        ($COUNT is 2)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)
+      subgram2:              '('
+      # Grammar + args literals DO NOT match, set ERR (which will skip to the next
+      # alternative [if any] in this parenthesis).
+      ERR="Unknown argument 'fish' after subcommand 'hunt'"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'|tomorrow)...)...'</div>
+    <div class="input b" label=args>'fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)
+      subgram2:              '(today'
+      # Reached '|' in grammar, but there was an error, so continue processing the
+      # next alternative to see if that match.
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'tomorrow)...)...'</div>
+    <div class="input b" label=args>'fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)
+      subgram2:              '(today|'
+      # Grammar + args literals DO NOT match, set ERR (which will skip to the next
+      # alternative [if any] in this parenthesis).
+      ERR="Unknown argument 'fish' after subcommand 'hunt'"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>')...)...'</div>
+    <div class="input b" label=args>'fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)
+      subgram2:              '(today|tomorrow'
+      # Reached ')' or ']' in grammar but there was an error, move grammar symbol to
+      # subgrammar, then decrease depth.
+      DEPTH--
+      COUNT=COUNT_$DEPTH
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'...)...'</div>
+    <div class="input b" label=args>'fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt)
+      subgram2:              '(today|tomorrow)'
+      # Grammar has '...', but previous paren failed (so there's no point running it
+      # again), so prepend subgrammar from DEPTH+1 to subgrammar of current DEPTH,
+      # and move grammar symbol there too.
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>')...'</div>
+    <div class="input b" label=args>'fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt) (today|tomorrow)...'
+      # Reached ')' or ']' in grammar without error (possibly skipping past some
+      # alternatives), move grammar symbol to subgrammar, then decrease depth.
+      PARENDONE=''
+      DEPTH--                       ($DEPTH is 0)
+      COUNT=COUNT_$DEPTH
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'...'</div>
+    <div class="input b" label=args>'fish tomorrow'</div>
+    <div class=code>
+      subgram1: '((fish|hunt) (today|tomorrow)...)'
+      # Grammar has '...', prepend subgrammar from DEPTH+1 without opening bracket.
+      DEPTH++                      ($DEPTH is 3)
+      COUNT=$COUNT_$DEPTH++        ($COUNT is 2)
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'(fish|hunt) (today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'fish tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      # Grammar has '(' or '[', increase depth, init counter, and append any
+      # previously existing subgrammar at this depth to the subgrammar above, then
+      # add paren to the current subgrammar depth.
+      DEPTH++               ($DEPTH is 2)
+      COUNT=1
+      COUNT_$DEPTH="$COUNT"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'fish|hunt) (today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'fish tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '('
+      # Grammar + args literals match, move to subgrammar, shift & set.
+      OPT_fish_$COUNT='fish'
+      VARS_$DEPTH+="OPT_fish_$COUNT"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'|hunt) (today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '(fish'
+      # Reached '|' in grammar without error, skip all other alternatives in paren by
+      # setting PARENDONE.
+      PARENDONE=1
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'hunt) (today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '(fish|'
+      # PARENDONE is set, so just move grammar symmol to subgrammar until we reach
+      # ')' or ']'.
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>') (today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '(fish|hunt'
+      # Reached ')' or ']' in grammar without error (possibly skipping past some
+      # alternatives), move grammar symbol to subgrammar, then decrease depth.
+      DEPTH--               ($DEPTH is 1)
+      COUNT=COUNT_$DEPTH
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'(today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '(fish|hunt)'
+      # Grammar has '(' or '[', increase depth, init counter, and append any
+      # previously existing subgrammar at this depth to the subgrammar above, then
+      # add paren to the current subgrammar depth.
+      DEPTH++
+      COUNT=1
+      COUNT_$DEPTH="$COUNT"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'today|tomorrow)...)...'</div>
+    <div class="input b" label=args>'tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '(fish|hunt)'
+      subgram3:              '('
+      # Grammar + args literals DO NOT match, set ERR (which will skip to the next
+      # alternative [if any] in this parenthesis).
+      ERR="Unknown argument 'tomorrow' after subcommand 'hunt'"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'|tomorrow)...)...'</div>
+    <div class="input b" label=args>'tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '(fish|hunt)'
+      subgram3:              '(today'
+      # Reached '|' in grammar, but there was an error, so continue processing the
+      # next alternative to see if that match.
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'tomorrow)...)...'</div>
+    <div class="input b" label=args>'tomorrow'</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '(fish|hunt)'
+      subgram3:              '(today|'
+      # Grammar + args literals match, move to subgrammar, shift & set.
+      OPT_tomorrow_$COUNT='tomorrow'
+      VARS_$DEPTH+="OPT_tomorrow_$COUNT"
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>')...)...'</div>
+    <div class="input b" label=args>''</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '(fish|hunt)'
+      subgram3:              '(today|tomorrow'
+      # Reached ')' or ']' in grammar without error (possibly skipping past some
+      # alternatives), move grammar symbol to subgrammar, then decrease depth.
+      DEPTH--
+      COUNT=COUNT_$DEPTH
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a" label=grammar>'...)...'</div>
+    <div class="input b" label=args>''</div>
+    <div class=code>
+      subgram1: '('
+      subgram2:  '(fish|hunt)'
+      subgram3:              '(today|tomorrow)'
+    </div>
+  </div>
+
+  <div class=iteration>
+    <div class="input a"></div>
+    </div>
+    ETC ETC
+  </div>
+</details>
+
+<h2>Difference between Docopt and Docoptz</h2>
+
+<p>Docoptz is more opinionated than Docopt, and wants you to do things a
+certain way (this is also a part of being small).
+
+<ul>
+  <li><tt>&lt;…&gt;</tt> is not supported. (Pointless feature, use upper case
+    for <a href="#name">names</a> instead.)
+
+  <li>Default defaults are declared with just <tt>default:</tt>. Anything after
+    that up until the first ')', ',' or ';' will be used as a default value.
+    (I’d suggest putting defaults in parenthesis, since that's common
+    practice.) E.g. <tt>(default: 10)</tt> or
+    <tt>--sort=WORD (default: name, unless using -U none, -S size, -t
+    time)</tt>
+
+    <tt>--color[=WHEN]  colorize output (default: auto)</tt>
+
+    colorize the output; WHEN can be 'always' (default
+                               if omitted), 'auto', or 'never'; more info below
+
+  <li>Docopt uses <tt>[options]</tt> to indicate any number of options
+    (declared under an <tt>Options:</tt> heading). Docoptz instead uses
+    <tt>[OPTION]...</tt> (more logical, yes?) and also allow any option name to
+    be used (see <tt>OPTION</tt> and <tt>SETTING</tt> below):
+
+<pre>froob [OPTION]... config (SETTING=VALUE)...
+
+Options:
+  -h, --help  display this help and exit
+
+Settings:
+  author  Set author name (default: $USER)
+  email   Set email address (default: $USER@$HOST)
+</pre>
+
+    <p>With the above grammar the command line <tt>froob config author=me
+    email=me@me</tt> will set:
+
+<pre>OPT_SETTING_1='author'; OPT_VALUE_1='me'
+OPT_SETTING_2='email';  OPT_VALUE_2='me@me'
+OPT_SETTING_MAX=2;      OPT_VALUE_MAX=2
+</pre>
+
+    <p>Actually, since there is a <tt>Settings:</tt> heading, the
+    term <tt>SETTING</tt> in the grammar above is internally replaced
+    by <tt>(author|email)</tt>. But if you remove the <tt>Settings:</tt>
+    headline, “<tt>SETTING</tt>” is instead interpreted as
+    a <a href="#name">name</a> – which match everything up until the end of the
+    argument, therefore instead setting <tt>OPT_SETTING_1='author=me';
+    OPT_SETTING_2='email=me@me'</tt>).
+
+  <li>Support for optional option arguments (e.g. <tt>--color[=WHEN]</tt>).
+
+    <p>Actually you can use '=' wherever you want in your grammar. (E.g. you could use
+    <tt>config (OPTION=VALUE)...</tt> to create an subcommand for setting
+    key/value pairs in the config.) The equal sign is
+    a <a href=#literal>literal</a> that requires that the
+    <a href="#symbol">symbols</a> on either side be joined with an equal sign (i.e.
+    they must be part of the same argument on the command line). NOTE:
+    <tt>VAR[=VALUE]...</tt> doesn't really make sense (it would set the
+    variables <tt>OPT_VAR_1="place"</tt> and <tt>OPT_VALUE_1="here=there"</tt>
+    being set).
+
+    <hr>
+    
+    with a the argument <tt>place=here=there</tt> it would result
+    in <tt>OPT_VALUE</tt> being set to <tt>here=there</tt>, because the first 
+
+    will not result in multiple VALUE(s) being assigned,
+    because the first VALUE will match everything up until the end of the command
+    line argument.)
+</ul>
+
+<pre>Naval Fate.
+
+Usage:
+  naval_fate ship new NAME...
+  naval_fate ship NAME move X Y [--speed=KN]
+  naval_fate ship shoot X Y
+  naval_fate mine (set|remove) X Y [--moored|--drifting]
+  naval_fate -h | --help
+  naval_fate --version
+
+Options:
+  -h, --help      Show this screen
+      --version   Show version
+      --speed=KN  Speed in knots (default: 10)
+      --moored    Moored (anchored) mine
+      --drifting  Drifting mine</pre>
+
+<h2>Terms</h2>
+<dl>
+  <dt id=alternative>alternative<dd>One of the alternatives inside
+      a <a href="#grouping">grouping</a>. E.g. there are two alternatives in
+      the expression <tt>(a|b)</tt>, namely <tt>a</tt> and <tt>b</tt>. Note
+      that an alternative may consist of any number of symbols, including
+      additional groupings. The grouping <tt>(a b|c [d e])</tt>, for example,
+      contains the alternatives <tt>a b</tt> and <tt>c [d e]</tt>.
+      Alternatives that are not inside a grouping are rule-level
+      alternatives. A grouping can contain any number of alternatives
+      (including one, or zero).
+
+  <dt id=bracket>bracket <tt>[]</tt><dd>An optional <a href="#grouping">grouping</a>.
+      Must match <tt>ARGS</tt> once or zero times (unless followed by
+      an <a href=#ellipsis>ellipsis</a> in which case it may match any number
+      of times).
+  <dt id=ellipsis>ellipsis (<tt>...</tt>)<dd>Comes after an <a href="#symbol">symbol</a> to
+      indicate that it may be repeated. After a bracket
+      (e.g. <tt>[OPTION]...</tt>) it indicates zero or more occurrences,
+      after any other type of symbol (e.g. <tt>NAME...</tt>
+      or <tt>(--help|--version)...</tt>) it indicates one or more
+      occurrences.
+  <dt id=symbol>symbol<dd>An symbol may be either
+      a <a href="#literal">literal</a>, <a href="#name">name</a> or
+      a <a href="#grouping">grouping</a>.
+  <dt id=literal>literal<dd>(A type of <a href="#symbol">symbol</a>.) Starts with
+      a hyphen (for <a href="#option">options</a>), or a lowercase letter or
+      number (<a href="#subcommand">subcommands</a>
+      or <a href="#argument">arguments</a>).
+
+      <p>When encountering a <i>literal</i> the algorithm takes a look at the
+      next argument in <tt>ARGS</tt>, and consider it a match if the literal
+      and the argument are identical. If they do not match, the processing of
+      the current <a href="#alternative">alternative</a> is aborted is
+      aborted, any variables set in this for the alternative so far is
+      cleared, and the algorithm skips forward to the
+      next <tt>|</tt>, <tt>)</tt> or <tt>]</tt>.
+
+  <dt id="shortoption_literal">longoption literal<dd>A type
+      of <a href=#literal>literal</a>. Starts with two hyphens and may only
+      contain lower case letters (a–z), numbers and hyphens. FIXME: If
+      followed by an argument, this argument MUST be separated with '=' (NOT
+      space).
+
+
+  <dt id=parenthesis>parenthesis <tt>()</tt><dd>A
+      required <a href="#grouping">grouping</a>. Must match <tt>ARGS</tt>
+      exactly once (unless followed by an <a href=#ellipsis>ellipsis</a> in
+      which case it may match any number of times, but must much at least
+      once).
+  <dt id=rule>rule<dd>Consists of one or more <a href=#symbol>symbols<a/>.
+  <dt id="shortoption_literal">shortoption literal<dd>A type
+      of <a href=#literal>literal</a>. Starts with one hyphen, followed by a
+      second character that may only be a letter (upper or lowercase) or a
+      number. FIXME: If a shortoption has an argument, this is parsed
+      separately, but should never be preceded by '='.</dd>
+
+<hr>
+  <dt id=grouping>grouping<dd>A grouping (written <tt>(…)</tt> or <tt>[…]</tt>)
+      contain zero or more <a href="#alternative">alternatives</a> separated
+      by <tt>|</tt>. Each of these alternatives may in turn contain additional
+      sub-groupings (ad infinitum). A grouping is considered successful as soon
+      as an alternative is found within it in which
+      all <a href=#consuming>consuming symbols</a> match, if no such
+      alternative can be found the grouping fails. Alternatives are tested one
+      at a time and the first successful alternative used, if an alternative
+      fails, all side effects of that alternative is cleaned up (meaning that
+      environment variables that where set are unset, and the position of the
+      command line arguments are rewound so that all the alternatives in a
+      grouping proceed from the same command line argument).
+
+  <dt id="consuming">consuming symbol<dd>These symbols consume a command line
+      argument. Consuming symbols can be either <a href=#literal>literal</a>
+      (which must match an argument on the command line argument)
+      or <a href=#nonliteral>non-literal</a> (for which there must exist a
+      command line argument, but what it consists of doesn't matter). When a
+      consuming symbol is processed a corresponding environment variable is
+      also set.<dd>
+
+  <dt id="argument">argument literal<dd>A literal symbol that starts with lower
+      case letter or digit, and thereafter contain only lowercase, digits and
+      hyphens. Like all <a href=#literal>literals</a>, it will succeed only if
+      it is identical to the next argument, fail otherwise. The first matched
+      argument literal in a rule is called a <a href=#subcommand>subcommand
+      literal</a>.
+
+  <dt id="longopt">longopt literal<dd>A literal symbol that starts with two
+      hyphens and is thereafter followed by only lowercase, digits and hyphens.
+
+  <dt id="shortopt">shortopt literal<dd>A literal symbol that starts with a
+      single hyphen and is thereafter followed by one additional character,
+      either uppercase, lowercase, or digit. <mark>((FIXME: bundling))</mark>
+
+  <dt id="subcommand">subcommand literal<dd>The first
+      matched <a href=#argument>argument literal</a> in a rule is called a
+      <i>subcommand.</i> Even though it matches in the exact same way as the
+      argument literal, it gets its own name since it is used in error messages
+      to provide the user with some more context about an error.
+
+  <dt id="literal">literal symbol<dd>A literal symbol in the grammar starts
+      with one hyphen (in the case of a <a href="#shortopt">shortopt
+      literal</a>), two hyphens (for <a href="#longopt">longopt literal</a>) or
+      a lowercase letter or digit (for an <a href="#subcommand">subcommand
+      literal</a> or an <a href="#argument">argument literal</a>).
+
+      It will succeed (and <a href="consuming">consume</a> the next command
+      line argument) if (and only if) the literal itself is identical to the
+      command line argument in question, otherwise it will fail. On success it
+      also sets an environment variable (the name of which is the same as the
+      option name with the leading hyphens removed and subsequent hyphens
+      changed into underscores). For example, if the
+      literal <tt>--help-all</tt> in the grammar matches up with the
+      argument <tt>--help-all</tt> it will
+      set <tt>DOCOPT_help_all='--help-all'</tt> (if it matches up with any
+      other command line argument, it'll fail and no environment variable will
+      be set).
+
+  <dt id=nonliteral>non-literal symbol<dd>A non-literal symbol in the grammar
+      starts with an uppercase letter, and may (thereafter) only contain
+      uppercase, numbers and hyphens
+      (regex <tt style=white-space:nowrap>[A-Z][A-Z0-9-]+</tt>). It
+      will <a href="consuming">consume</a> one command line argument (or fail
+      if there were no command line argument to be found) and set a
+      corresponding environment variable. E.g. if the non-literal <tt>NAME</tt>
+      matches argument <tt>Enterprise</tt> it will
+      set <tt>DOCOPT_NAME='Enterprise'</tt>.
+
+  <dt id="syntactic">syntactic symbol<dd>These symbols determine the structure
+      of the grammar, but does not consume anything from the command line being
+      checked. Syntactic symbols are used
+      for <a href="#grouping">grouping</a> (<tt>(</tt>, <tt>)</tt>, <tt>[</tt>,
+      <tt>]</tt> and <tt>|</tt>) and <a href="#repetition">repetition</a>
+      (<tt>...</tt>). <mark>((FIXME: Currently all the grammar is parse, but
+      will that be the case in the end?))</mark>
+</dl>
+<!--[eof]-->

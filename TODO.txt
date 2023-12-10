@@ -5,7 +5,6 @@
 ** TODO Link to docopt
 ** DONE License
    CLOSED: [2023-12-04 Mon 14:23]
-* TODO Algorithm description
 * [0/6] Test suite
 ** [6/9] Use Dashtap test framework
 *** DONE Remove tests from `docoptz.sh` source, put in separate directory
@@ -54,6 +53,10 @@
        -----------------------------------------------------------------
 ** TODO Each test should be a function (test1...N)
    This to allow random order testing + test can show ID on failure.
+* [1/2] `docoptz.html` (Algorithm description)
+** DONE Add `docoptz.html` web page (with some description)
+   CLOSED: [2023-12-10 Sun 21:07]
+** TODO Explain the inner workings of the code better
 * [1/8] `docoptz.sh` (Dash version)
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
