@@ -1,8 +1,10 @@
 -*- org -*-
 
-* [1/3] README
-** TODO Describe what docoptz is
-** TODO Link to docopt
+* [3/3] README
+** DONE Describe what docoptz is
+   CLOSED: [2023-12-11 Mon 23:37]
+** DONE Link to docopt
+   CLOSED: [2023-12-11 Mon 23:37]
 ** DONE License
    CLOSED: [2023-12-04 Mon 14:23]
 * [0/6] Test suite
