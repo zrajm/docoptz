@@ -155,13 +155,12 @@ eqvar() {
 # Modifies content in variable VARNAME by prepending PREFIX to all lines in it.
 prefix() {
     ok_varname "$1" prefix || return 1
-    # Globbing is turned off (`set -f`) locally (`local -`) otherwise the
-    # `IFS`/`set` linesplitting also glob expands words containing '*' (iff
-    # there are matching files) -- which would be very confusing.
-    local - _VAR="$1" _PRE="$2" _ARG='' IFS='
+    local _VAR="$1" _PRE="$2" _ARG='' IFS='
 '                                              # intentional newline
-    set -f                                     # disable globbing
-    eval "set -- \${$1}"                       # linesplit VARNAME into $@
+    # Turn off globs (`set -f`) locally (`local -`) here, otherwise splitting
+    # of unquoted variable in `set --` would also do glob expansion (if there
+    # are matching files) which would be very confusing.
+    local -; set -f; eval "set -- \${$1}"      # linesplit VARNAME into $@
     for _ARG in "$@"; do
         shift
         set -- "$@" "$_PRE$_ARG"
@@ -319,13 +318,14 @@ parse() {
     local _VAR="$1" _INPUT="$2"
     ok_varname "$_VAR" parse || return 1
     # Tokenize by adding space round syntactic chars, then split into $@.
-    local _STR _SHOPT="$-"                     # save shell options
+    local _STR
     for _STR in '(' '[' '|' ']' ')' '...'; do  # foreach syntactic string
         replace _INPUT "$_STR" " $_STR "       #   add space around them
     done
-    set -f                                     # turn noglob ON
-    set -- $_INPUT                             # intentionally unquoted
-    case "$_SHOPT" in *f*) ;; *) set +f; esac  # restore noglob state
+    # Turn off globs (`set -f`) locally (`local -`) here, otherwise splitting
+    # of unquoted variable in `set --` would also do glob expansion (if there
+    # are matching files) which would be very confusing.
+    local -; set -f; set -- $_INPUT            # intentionally unquoted
     _DEBUG_STATE=''                            # used in testing
     _DEBUG_GROUP=''
     _DEBUG_LEVEL=''
