@@ -6,6 +6,7 @@
 
 cat() { stdin <"$1"; }
 dumpenv() {
+    local VAR
     for VAR in "$@"; do
         local "$VAR"
         unset "$VAR"
@@ -19,61 +20,69 @@ function_exists parse "Function 'parse' exists"
 cd "$(mktemp -d)"
 title "parse: Badly placed '...' (at beginning)"
 INPUT='...'
-parse GOTTED_RULES "$INPUT" 2>stderr && :; RETVAL="$?" # intentionally unquoted
-is "$RETVAL"       '1'                                  'Return value'
+parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
+is "$RC"           '1'                                  'Return value'
 is "$(cat stderr)" "$BIN: Badly placed '...' in rule: ...
 (Must come after ARGUMENT or end parenthesis/bracket.)" 'Error message'
+unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
 title "parse: Badly placed '...' (after start parenthesis)"
 INPUT='( ...'
-parse GOTTED_RULES "$INPUT" 2>stderr && :; RETVAL="$?" # intentionally unquoted
-is "$RETVAL"       '1'                                  'Return value'
+parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
+is "$RC"           '1'                                  'Return value'
 is "$(cat stderr)" "$BIN: Badly placed '...' in rule: ( ...
 (Must come after ARGUMENT or end parenthesis/bracket.)" 'Error message'
+unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
 title "parse: Badly placed '|' (outside paren)"
 INPUT='|'
-parse GOTTED_RULES "$INPUT" 2>stderr && :; RETVAL="$?" # intentionally unquoted
-is "$RETVAL"       '1'                                 'Return value'
+parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
+is "$RC"           '1'                                 'Return value'
 is "$(cat stderr)" "$BIN: Badly placed '|' in rule: |
 (Must be inside parentheses/brackets.)"                'Error message'
+unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
 title "parse: One ')' too many"
 INPUT='A )'
-parse GOTTED_RULES "$INPUT" 2>stderr && :; RETVAL="$?" # intentionally unquoted
-is "$RETVAL"       '1'                                     'Return value'
+parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
+is "$RC"           '1'                                     'Return value'
 is "$(cat stderr)" "$BIN: Too many ')' in rule: A )"       'Error message'
+unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
 title "parse: One ']' too many"
 INPUT='A ]'
-parse GOTTED_RULES "$INPUT" 2>stderr && :; RETVAL="$?" # intentionally unquoted
-is "$RETVAL"       '1'                                     'Return value'
+parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
+is "$RC"           '1'                                     'Return value'
 is "$(cat stderr)" "$BIN: Too many ']' in rule: A ]"       'Error message'
+unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
 title "parse: Missing ')'"
 INPUT='[ A )'
-parse GOTTED_RULES "$INPUT" 2>stderr && :; RETVAL="$?" # intentionally unquoted
-is "$RETVAL"       '1'                                     'Return value'
+parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
+is "$RC"           '1'                                     'Return value'
 is "$(cat stderr)" "$BIN: Missing ')' in rule (group 1): [ A )" 'Error message'
+unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
 title "parse: Missing ']'"
 INPUT='( A ]'
-parse GOTTED_RULES "$INPUT" 2>stderr && :; RETVAL="$?" # intentionally unquoted
-is "$RETVAL"       '1'                                     'Return value'
+parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
+is "$RC"           '1'                                     'Return value'
 is "$(cat stderr)" "$BIN: Missing ']' in rule (group 1): ( A ]" 'Error message'
+unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
 title "parse: Missing ']'"
 INPUT='( A'
-parse GOTTED_RULES "$INPUT" 2>stderr && :; RETVAL="$?" # intentionally unquoted
-is "$RETVAL"       '1'                                     'Return value'
+parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
+is "$RC"           '1'                                     'Return value'
 is "$(cat stderr)" "$BIN: Missing ')' at end of rule: ( A" 'Error message'
+unset INPUT GOTTED_RULES RC
 
 ###############################################################################
 
@@ -87,13 +96,13 @@ RULES='0 2 A
 2 1 B
 0 x
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   [   B   ]   ]'
@@ -104,13 +113,13 @@ RULES='0 2 A
 2 3 B
 0 x
 3 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   ]   [   B   [   C   ]   [   D   ]   ]'
@@ -126,13 +135,13 @@ RULES='0 1 A
 0 x
 1 x
 5 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   ]'
@@ -142,13 +151,13 @@ STATE='0 [ 0 A 1 ] 1'
 RULES='0 1 A
 0 x
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   ]   B'
@@ -159,13 +168,13 @@ RULES='0 1 A
 0 2 B
 1 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   ]   [   B   ]   C'
@@ -179,13 +188,13 @@ RULES='0 1 A
 1 3 C
 2 3 C
 3 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   ]   B   [   C   ]  '
@@ -198,13 +207,13 @@ RULES='0 1 A
 2 3 C
 2 x
 3 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   |   B   ]   C   [   D   |   E   ]  '
@@ -219,13 +228,13 @@ RULES='0 1 A
 2 3 E
 2 x
 3 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   ]   [   B   ]   [   C   ]'
@@ -242,13 +251,13 @@ RULES='0 1 A
 1 x
 2 x
 3 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   ]   [   B   ]   [   C   |   D   ]'
@@ -269,13 +278,13 @@ RULES='0 1 A
 1 x
 2 x
 3 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   ]   [   B   [   C   ]   [   D   ]   ]'
@@ -291,13 +300,13 @@ RULES='0 1 A
 0 x
 1 x
 5 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   ]   [   B   ]'
@@ -310,13 +319,13 @@ RULES='0 1 A
 0 x
 1 x
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   ]   (   B   )'
@@ -327,13 +336,13 @@ RULES='0 1 A
 0 2 B
 1 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   )   [   B   ]'
@@ -344,13 +353,13 @@ RULES='0 1 A
 1 2 B
 1 x
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   a   ]   [   [   b   ]   c   ]'
@@ -366,13 +375,13 @@ RULES='0 1 a
 0 x
 1 x
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   a   ]   [   [   b   ]   [   c   ]   d   ]'
@@ -392,13 +401,13 @@ RULES='0 1 a
 0 x
 1 x
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   ]   [   B   ]'
@@ -411,13 +420,13 @@ RULES='0 1 A
 0 x
 1 x
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...   X'
@@ -439,13 +448,13 @@ RULES='0 2 A
 0 8 X
 1 8 X
 8 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  A'
@@ -454,13 +463,13 @@ GROUP='0 A 0'
 STATE='0 A 1'
 RULES='0 1 A
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  A   B'
@@ -470,13 +479,13 @@ STATE='0 A 1 B 2'
 RULES='0 1 A
 1 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   B   )'
@@ -486,13 +495,13 @@ STATE='0 ( 0 A 2 B 1 ) 1'
 RULES='0 2 A
 2 1 B
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   B   ) ...'
@@ -503,13 +512,13 @@ RULES='0 2 A
 2 1 B
 1 2 A
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   )   B'
@@ -519,13 +528,13 @@ STATE='0 ( 0 A 1 ) 1 B 2'
 RULES='0 1 A
 1 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 # FIXME: '(X...)...' doesn't make sense. Should it be forbidden?
@@ -538,13 +547,13 @@ RULES='0 1 A
 1 1 A
 1 1 A
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   ...   |   B   )   ...'
@@ -564,13 +573,13 @@ title "parse: FIXME Why does '1 1 A' exist twice in above rules?"
 # 0 1 B
 # 1 1 B
 # 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   )   ...   B'
@@ -581,13 +590,13 @@ RULES='0 1 A
 1 1 A
 1 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  A   (   B   )'
@@ -597,13 +606,13 @@ STATE='0 A 1 ( 1 B 2 ) 2'
 RULES='0 1 A
 1 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  A   (   B   ) ...'
@@ -614,13 +623,13 @@ RULES='0 1 A
 1 2 B
 2 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   )   (   B   )'
@@ -630,13 +639,13 @@ STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'
 RULES='0 1 A
 1 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   )   ...   (   B   )'
@@ -647,13 +656,13 @@ RULES='0 1 A
 1 1 A
 1 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   )   (   B   )   ...'
@@ -664,13 +673,13 @@ RULES='0 1 A
 1 2 B
 2 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   )   ...   (   B   )   ...'
@@ -682,13 +691,13 @@ RULES='0 1 A
 1 2 B
 2 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   (   A   )   B   )'
@@ -698,13 +707,13 @@ STATE='0 ( 0 ( 0 A 2 ) 2 B 1 ) 1'
 RULES='0 2 A
 2 1 B
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   (   B   )   )'
@@ -714,13 +723,13 @@ STATE='0 ( 0 A 2 ( 2 B 3 ) 3 ) 3'              # (state 1 never used)
 RULES='0 2 A
 2 3 B
 3 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   (   B   (   C   )   )   )'
@@ -731,13 +740,13 @@ RULES='0 2 A
 2 4 B
 4 5 C
 5 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   X'
@@ -755,13 +764,13 @@ RULES='0 2 A
 7 1 I
 1 8 X
 8 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   X'
@@ -780,13 +789,13 @@ RULES='0 2 A
 0 8 X
 1 8 X
 8 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...   X'
@@ -808,13 +817,13 @@ RULES='0 2 A
 0 8 X
 1 8 X
 8 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   )'
@@ -823,13 +832,13 @@ GROUP='0 ( 1 A 1 ) 0'
 STATE='0 ( 0 A 1 ) 1'
 RULES='0 1 A
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   (   A   B   )   )'
@@ -839,13 +848,13 @@ STATE='0 ( 0 ( 0 A 3 B 2 ) 2 ) 2'
 RULES='0 3 A
 3 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  [   A   ]'
@@ -855,13 +864,13 @@ STATE='0 [ 0 A 1 ] 1'
 RULES='0 1 A
 0 x
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   |   B   )'
@@ -871,13 +880,13 @@ STATE='0 ( 0 A 1 | 0 B 1 ) 1'
 RULES='0 1 A
 0 1 B
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   |   B   )   ...'
@@ -889,13 +898,13 @@ RULES='0 1 A
 1 1 A
 1 1 B
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  A   ...   B'
@@ -906,13 +915,13 @@ RULES='0 1 A
 1 1 A
 1 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   ) ... B'
@@ -923,13 +932,13 @@ RULES='0 1 A
 1 1 A
 1 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   B   )   ...'
@@ -940,13 +949,13 @@ RULES='0 2 A
 2 1 B
 1 2 A
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   )   (   B   )'
@@ -956,13 +965,13 @@ STATE='0 ( 0 A 1 ) 1 ( 1 B 2 ) 2'
 RULES='0 1 A
 1 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   )   (   B   )   ...'
@@ -973,13 +982,13 @@ RULES='0 1 A
 1 2 B
 2 2 B
 2 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   (   B   )   )   ...'
@@ -990,13 +999,13 @@ RULES='0 2 A
 2 3 B
 3 2 A
 3 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   (   A   )   B   )   ...'
@@ -1007,13 +1016,13 @@ RULES='0 2 A
 2 1 B
 1 2 A
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   (   (   A   )   B   )   C   )   ...'
@@ -1025,13 +1034,13 @@ RULES='0 3 A
 2 1 C
 1 3 A
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   (   (   A   )   ...   B   )   C   )   ...'
@@ -1044,13 +1053,13 @@ RULES='0 3 A
 2 1 C
 1 3 A
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   (   A   )   ...   B   )'
@@ -1061,13 +1070,13 @@ RULES='0 2 A
 2 2 A
 2 1 B
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   (   A   )   ...   B   )   ...'
@@ -1079,13 +1088,13 @@ RULES='0 2 A
 2 1 B
 1 2 A
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: normal operation"
 INPUT='  (   A   (   B   (   C   )   )   )   ...'
@@ -1097,13 +1106,13 @@ RULES='0 2 A
 4 5 C
 5 2 A
 5 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 ######################################################################
 
@@ -1122,13 +1131,13 @@ RULES='0 2 A
 6 7 H
 7 1 I
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: Tests from Images of Finite State Automaton (4 tests)"
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]'
@@ -1146,13 +1155,13 @@ RULES='0 2 A
 7 1 I
 0 x
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title "parse: Tests from Images of Finite State Automaton (4 tests)"
 INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   ...'
@@ -1172,13 +1181,13 @@ RULES='0 2 A
 1 4 D
 1 6 G
 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
 title "parse: Tests from Images of Finite State Automaton (4 tests)"
@@ -1203,21 +1212,21 @@ RULES='0 2 A
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env1.txt # expect
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
-is "$RETVAL"       '0'      'Return value'
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
 title "parse: '...' (after word) inside end of parentheses"
@@ -1232,21 +1241,21 @@ RULES="0 1 A
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     > env1.txt # expect
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
-is "$RETVAL"       '0'      'Return value'
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
 title "parse: '...' (after paren group) inside end of parentheses"
@@ -1262,21 +1271,21 @@ RULES="0 1 A
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     > env1.txt # expect
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
-is "$RETVAL"       '0'      'Return value'
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 #is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
 title "parse: '...' (after bracket group) inside end of parentheses"
@@ -1289,21 +1298,21 @@ RULES=''
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     > env1.txt # expect
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
-is "$RETVAL"       '0'      'Return value'
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 #is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 :<<'#BLOCK_COMMENT'
 exit
@@ -1323,21 +1332,21 @@ RULES=''
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     > env1.txt # expect
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
-is "$RETVAL"       '0'      'Return value'
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 #is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 ################################################################################
 
@@ -1361,21 +1370,21 @@ RULES=''
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     > env1.txt # expect
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
-is "$RETVAL"       '0'      'Return value'
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 #is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 ################################################################################
 
@@ -1389,21 +1398,21 @@ RULES=''
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     > env1.txt # expect
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 dumpenv \
     _DEBUG_STATE _DEBUG_GROUP _DEBUG_LEVEL \
     INPUT LEVEL GROUP STATE \
-    GOTTED_RULES RETVAL TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
+    GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
-is "$RETVAL"       '0'      'Return value'
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 #is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 ################################################################################
 exit
@@ -1432,13 +1441,13 @@ STATE='0 ( 0 ship 2 ( 2 new 4 NAME 5 ... 5 | 2 NAME 6 move 7 X 8 Y 9 [ 9 --speed
 # 7 1 I
 # 0 x
 # 1 x'
-parse GOTTED_RULES "$INPUT" && :; RETVAL="$?"  # intentionally unquoted
-is "$RETVAL"       '0'      'Return value'
+parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
+is "$RC"           '0'      'Return value'
 is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
 is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
 #is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 # is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RETVAL
+unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 #BLOCK_COMMENT
 

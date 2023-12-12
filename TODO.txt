@@ -7,8 +7,8 @@
    CLOSED: [2023-12-11 Mon 23:37]
 ** DONE License
    CLOSED: [2023-12-04 Mon 14:23]
-* [0/6] Test suite
-** [6/9] Use Dashtap test framework
+* [0/7] Test suite
+** [8/8] Use Dashtap test framework
 *** DONE Remove tests from `docoptz.sh` source, put in separate directory
     CLOSED: [2023-12-09 Sat 16:33]
     Right now the tests cases are part of `docoptz.sh`, but that only works
@@ -34,8 +34,10 @@
     CLOSED: [2023-12-10 Sun 20:33]
 *** DONE Update README with how to use submodules (for Dashtap)
     CLOSED: [2023-12-10 Sun 20:37]
-*** TODO Rename variable 'RETVAL' -> 'RC' in test cases
-*** TODO Unset 'RC' after it's been used in each test case
+*** DONE Rename variable 'RETVAL' -> 'RC' in test cases
+    CLOSED: [2023-12-11 Mon 23:43]
+*** DONE Unset 'RC' after it's been used in each test case
+    CLOSED: [2023-12-12 Tue 01:04]
 ** TODO Test cases making sure that `set -e` works
 ** TODO Test cases making sure that `set -u` works
 ** TODO A test case which tests that `. ./docoptz.sh` loads OK

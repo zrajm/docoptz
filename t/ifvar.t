@@ -11,21 +11,22 @@ function_exists ifvar "Function 'ifvar' exists"
 
 cd "$(mktemp -d)"
 title "ifvar"
-ifvar a 2>stderr && :; RETVAL="$?"
-is "$RETVAL"       '1'                                   'Return value'
+ifvar a 2>stderr && :; RC="$?"
+is "$RC"       '1'      'Return value'
 is "$(cat stderr)" "$BIN: ifvar: Bad variable name 'a'"  'Error message'
+unset RC
 
 title "ifvar"
 A='('
-ifvar A && :; RETVAL="$?"
-is "$RETVAL"       '0'      'Return value'
-unset A
+ifvar A && :; RC="$?"
+is "$RC"       '0'      'Return value'
+unset A RC
 
 title "ifvar"
 A=''
-ifvar A && :; RETVAL="$?"
-is "$RETVAL"       '1'      'Return value'
-unset A
+ifvar A && :; RC="$?"
+is "$RC"       '1'      'Return value'
+unset A RC
 
 done_testing
 #[eof]

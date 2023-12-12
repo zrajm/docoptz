@@ -11,15 +11,16 @@ function_exists setvar "Function 'setvar' exists"
 
 cd "$(mktemp -d)"
 title "setvar: Set invalid variable name"
-setvar a 2>stderr && :; RETVAL="$?"
-is "$RETVAL"       '1'                                   'Return value'
+setvar a 2>stderr && :; RC="$?"
+is "$RC"       '1'                                   'Return value'
 is "$(cat stderr)" "$BIN: setvar: Bad variable name 'a'" 'Error message'
+unset RC
 
 title "setvar: Set variable name"
-setvar GOTTED '()' && :; RETVAL="$?"
+setvar GOTTED '()' && :; RC="$?"
 is "$GOTTED"       '()'     'Gotted value'
-is "$RETVAL"       '0'      'Return value'
-unset GOTTED
+is "$RC"       '0'      'Return value'
+unset GOTTED RC
 
 done_testing
 #[eof]

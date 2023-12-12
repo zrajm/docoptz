@@ -11,22 +11,24 @@ function_exists getvar "Function 'getvar' exists"
 
 cd "$(mktemp -d)"
 title "getvar: Invalid variable name as 1st arg"
-getvar a 2>stderr && :; RETVAL="$?"
-is "$RETVAL"  '1'                                   'Return value'
-is "$(cat stderr)"  "$BIN: getvar: Bad variable name 'a'" 'Error message'
+getvar a 2>stderr && :; RC="$?"
+is "$RC"       '1'      'Return value'
+is "$(cat stderr)"      "$BIN: getvar: Bad variable name 'a'"  'Error message'
+unset RC
 
 cd "$(mktemp -d)"
 title "getvar: Invalid variable name as 2nd arg"
-getvar A b 2>stderr && :; RETVAL="$?"
-is "$RETVAL"  '1'                                   'Return value'
-is "$(cat stderr)"  "$BIN: getvar: Bad variable name 'b'" 'Error message'
+getvar A b 2>stderr && :; RC="$?"
+is "$RC"       '1'      'Return value'
+is "$(cat stderr)"      "$BIN: getvar: Bad variable name 'b'"  'Error message'
+unset RC
 
 title "getvar: Get value containing '()'"
 VAL="()"
-getvar GOTTED VAL && :; RETVAL="$?"
-is "$GOTTED"       '()'     'Gotted value'
-is "$RETVAL"       '0'      'Return value'
-unset GOTTED VAL
+getvar GOTTED VAL && :; RC="$?"
+is "$GOTTED"   '()'     'Gotted value'
+is "$RC"       '0'      'Return value'
+unset GOTTED VAL RC
 
 done_testing
 #[eof]
