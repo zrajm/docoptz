@@ -1,23 +1,12 @@
 -*- org -*-
 
-* [0/7] `t/*.t` (Test suite)
+* [0/5] `t/*.t` (Test suite)
+** TODO Fix tests in `t/parse.t`
 ** TODO Test cases making sure that `set -e` works
 ** TODO Test cases making sure that `set -u` works
 ** TODO A test case which tests that `. ./docoptz.sh` loads OK
    Also, make sure that the shell options aren't modified during load (e.g.
    `set -e` should not be enabled by during load).
-** TODO Check in the modified Dashtap into the fix.sh repo, add tests there
-** TODO Break out Dashtap into its own repository, include as submodule
-** TODO Dashtap needs to be resilient when shell globals are set
-   `set -e` fucked up the `is` output on failure, making it output
-       -----------------------------------------------------------------
-       t/shell-globals.t: 637: return: Illegal number:  e
-       -----------------------------------------------------------------
-
-   Rather than the expected:
-       -----------------------------------------------------------------
-       Failed test '...'
-       -----------------------------------------------------------------
 ** TODO Each test should be a function (test1...N)
    This to allow random order testing + test can show ID on failure.
 * [1/2] `docoptz.html` (Algorithm description)
