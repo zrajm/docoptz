@@ -2,6 +2,7 @@
 
 * [0/5] `t/*.t` (Test suite)
 ** TODO Fix tests in `t/parse.t`
+** TODO Add tests for prefix() function
 ** TODO Test cases making sure that `set -e` works
 ** TODO Test cases making sure that `set -u` works
 ** TODO A test case which tests that `. ./docoptz.sh` loads OK
@@ -9,23 +10,85 @@
    `set -e` should not be enabled by during load).
 ** TODO Each test should be a function (test1...N)
    This to allow random order testing + test can show ID on failure.
-* [1/2] `docoptz.html` (Algorithm description)
+* [1/3] Documentation (`docoptz.html`, `README.md` etc.)
 ** DONE Add `docoptz.html` web page (with some description)
    CLOSED: [2023-12-10 Sun 21:07]
+** TODO Add images referred to in `docoptz.sh` comments
+   Are these the Google Note images I drew on my phone? To find the comment
+   referring to this search for 'purple' in `docoptz.sh`.
 ** TODO Explain the inner workings of the code better
-* [1/8] `docoptz.sh` (Dash version)
+* [1/13] `docoptz.sh` (Dash version)
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
    :END:
-** [0/1] TESTS
-*** TODO Add tests for prefix() function
-** TODO Use `set -eu`
 ** TODO Finish the grammar parsing
-** [0/5] FUTURE MILESTONES
+** [0/9] FUTURE MILESTONES
+*** TODO Options defined separately
+    I.e. add an 'Options:' heading, and define options there.
 *** TODO Multiple invocations of parse, building up a grammar?
 *** TODO Allow 'xxx|yyy' (without parentheses) ??
 *** TODO Stop using $IN and $GROUP? (if possible)
 *** TODO Remove dead code
+*** TODO Allow optional optargs `--color[=WHEN]`
+    Should this allow for both `--color[=WHEN]` and `--color[=(yes|no|auto)]`
+    syntax? What would this look like in the outputted options?
+*** TODO Allow arguments to wrap over multiple lines
+    Like so:
+        ---------------------------------------------------------------
+        Usage: git [-C PATH] [-c NAME=VALUE] [--exec-path[=PATH]]
+                   [--html-path] [--man-path] [--info-path]
+                   [-p | --paginate | -P | --no-pager]
+                   [--no-replace-objects] [--bare] [--git-dir=PATH]
+                   [--work-tree=PATH] [--namespace=NAME]
+                   [--super-prefix=PATH] [--config-env=NAME=ENVVAR]
+                   COMMAND [ARGS]
+               git (--version|--help)
+        The stupid content tracker.
+        ---------------------------------------------------------------
+*** TODO Allow options to wrap over multiple lines
+    E.g. the following. Notice the comma before the description on the first
+    line!
+        ---------------------------------------------------------------
+        Options:
+          -c,--color[=(yes|no|auto)],  Colorize the output (default: 'yes')
+             --colour[=(yes|no|auto)]  (default without option is 'auto')
+        ---------------------------------------------------------------
+*** TODO Multiple options lists(?)
+    Should be able to split options into groups, in the way `grep` does.
+
+        ---------------------------------------------------------------
+        Pattern selection and interpretation:
+          -E, --extended-regexp     PATTERNS are extended regular expressions
+          -F, --fixed-strings       PATTERNS are strings
+          ...
+
+        Miscellaneous:
+          -s, --no-messages         suppress error messages
+          -v, --invert-match        select non-matching lines
+          ...
+        ---------------------------------------------------------------
+
+    The way Docopt support this is by allowing any number of options headings
+    as long as they all end in 'options:'. But maybe we can do something
+    cleverer that would also allow for subcommands being listed this way? E.g.
+    something like this? (NOTE: This conflicts with the current syntax, as
+    options need to start with '-', also we need to make sure descriptions can
+    be line-wrapped.)
+
+        ---------------------------------------------------------------
+        Usage: merpstore [OPTIONS]... [COMMAND [ARGS]]
+
+        Options:
+          -f,--file=NAME  File to read (default: ~/.merpstorerc)
+          -h,--help       Display this help and exit
+          -V,--version    Output version information and exit
+
+        Commands:
+          list                List all keys of all the currently stored
+                              key-value pairs
+          get KEY...          Get value of KEY
+          set (KEY VALUE)...  Set KEY to VALUE
+        ---------------------------------------------------------------
 ** [0/0] DONE
 ** DONE Rename to use .sh or .dash file suffix
    CLOSED: [2023-12-03 Sun 13:29]

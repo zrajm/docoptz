@@ -2,7 +2,7 @@
 
 Docoptz is slightly opinionated implementation of [Docopt] written using the
 [Dash] shell. Like Docopt, it allows you to specify a program's command line
-syntax by simply describing it in your `--help` messsage.
+syntax by simply describing it in your `--help` message.
 
 
 ## A Simple Example

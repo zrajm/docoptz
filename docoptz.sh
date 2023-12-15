@@ -1,61 +1,6 @@
 #!/bin/sh
 # Copyright (C) 2020-2023 zrajm <docoptz@zrajm.org>
 # Licensed under GNU GPL version 2, see LICENSE-GPL2.txt for details.
-#
-# Usage: pushdownmachine --test
-# Run tests.
-#
-
-## Desired features:
-## * Optional option arguments --color[=WHEN]
-## * Arguments wrapping over multiple lines
-## * Later: Multiple options lists(?)
-## * Options defined separately
-##
-## =============================================================================
-##
-## Example Usage
-## =============
-##
-## Usage: ls [OPTION]... [FILE]...
-## List information about the FILEs (the current directory by default).
-## Sort entries alphabetically if none of -cftuvSUX nor --sort is specified.
-##
-## Mandatory arguments to long options are mandatory for short options too.
-##   -a, --all                  do not ignore entries starting with .
-##   ...
-##
-## -----------------------------------------------------------------------------
-##
-## usage: git [--version] [--help] [-C <path>] [-c <name>=<value>]
-##            [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
-##            [-p | --paginate | --no-pager] [--no-replace-objects] [--bare]
-##            [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]
-##            <command> [<args>]
-##
-## -----------------------------------------------------------------------------
-## (From docopt documentation)
-##
-## Naval Fate.
-##
-## Usage:
-##   naval_fate ship new NAME...
-##   naval_fate ship NAME move X Y [--speed=KN]
-##   naval_fate ship shoot X Y
-##   naval_fate mine (set|remove) X Y [--moored|--drifting]
-##   naval_fate -h | --help
-##   naval_fate --version
-##
-## Options:
-##   -h,--help      Show this screen.
-##      --version   Show version.
-##      --speed=KN  Speed in knots [default: 10].
-##      --moored    Moored (anchored) mine.
-##      --drifting  Drifting mine.
-##
-## =============================================================================
-
-################################################################################
 
 out() { printf '%s\n' "$*"; }
 warn() {
@@ -248,13 +193,16 @@ replace() {
 # parsing a command line. Also checks the validity/nesting of (...) and [...]
 # constructs. (Failing if brackets or parentheses are unbalanced.)
 #
-# The generated rules will be saved in the specified RULESVAR. Each rule is
-# separated by an newline, and is of the format 'STARTSTATE ENDSTATE [INPUT]'.
-# If no INPUT is present, then ENDSTATE is always 'x'.
+# The generated rules are saved in the variable called RULESVAR, which will
+# contain multiple lines of text. Collectively these lines make up a
+# state-transition table of a finite state machine, with each line containing
+# two or three words in the format: 'STARTSTATE ENDSTATE [INPUT]'. The lines
+# with no INPUT all come at the end of RULES, all have an ENDSTATE of 'x' --
+# these indicate which states are allowed final states.
 #
 # The following special characters are recognized:
-#   * Group start: '[' or '('
-#   * Group end: ']' or ')'
+#   * Optional group: '[' ... ']'
+#   * Required group: '(' ... ')'
 #   * Subgroup separator: '|'
 #   * Group repeat: '...'
 #
@@ -266,13 +214,13 @@ replace() {
 #
 # Internals:
 #
-# LVL is the current level of nesting. GROUPS in the number of the current
-# parenthesis. In '()()' GROUPS is 1 and 2, and LVL 0 and 1. In '(())' GROUPS
-# is also 1 & 2, but LVL is 0 (outside paren), 1 (inside first paren), and 2
-# (inside innermost paren). I.e. GROUPS never decreases, while LVL does. IN is
-# the current group we're in, so in '()()' it looks like this '0(1)0(2)0',
-# while in '(())' its '0(1(2)1)0'.
-
+# LVL is the current level of nesting. GROUP is the number of the current
+# parenthesis (analogous to regular expression capture group variables, $1, $2
+# etc, used in Perl and Javascript). In '()()' GROUP is 1 and 2, and LVL 0 and
+# 1. In '(())' GROUP is also 1 and 2, but LVL is 0 (outside paren), 1 (inside
+# first paren), and 2 (inside innermost paren). I.e. GROUP never decreases,
+# while LVL does. IN is the current group we're in, so in '()()' it looks like
+# '0(1)0(2)0', while in '(())' its '0(1(2)1)0'.
 #
 # GROUP0...N is a pseudo-array containing group stack. It has no meaning
 # outside this loop. It contains the group number of the current parenthetical
@@ -303,15 +251,15 @@ replace() {
 # Upon reaching the end of the input string, check to make sure were in one of
 # the final states.
 
-# STATE is the currently processed state, STATEMAX is the maxiumum state used
-# so far (for each state added STATEMAX is increased, so that it is the highest
+# STATE is the currently processed state, STATEMAX is the maximum state used so
+# far (for each state added STATEMAX is increased, so that it is the highest
 # STATE used so far).
 
 # Usage: parse RULESVAR DOCSTR
 #
 # Go through TOKEN(s) and create finite-state machine rules suitable for
-# parsing the command line specified by DOCSTR. Will fail (returning false)
-# DOCSTR is malformed, if everything went well, returns true and set the
+# parsing the command line specified by DOCSTR. Will fail (returning false) if
+# DOCSTR is malformed, or if everything went well, returns true and set the
 # RULESVAR variable to a (multiline) string with rules for a finite state
 # automaton, suitable for parsing a command line.
 parse() {
