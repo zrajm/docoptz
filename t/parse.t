@@ -18,7 +18,7 @@ BIN="${0##*/}"
 function_exists parse "Function 'parse' exists"
 
 cd "$(mktemp -d)"
-title "parse: Badly placed '...' (at beginning)"
+title 'parse `...`: `...` not allowed at beginning'
 INPUT='...'
 parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
 is "$RC"           '1'                                  'Return value'
@@ -27,7 +27,7 @@ is "$(cat stderr)" "$BIN: Badly placed '...' in rule: ...
 unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
-title "parse: Badly placed '...' (after start parenthesis)"
+title 'parse `(...`: `...` not allowed after start parenthesis'
 INPUT='( ...'
 parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
 is "$RC"           '1'                                  'Return value'
@@ -36,7 +36,7 @@ is "$(cat stderr)" "$BIN: Badly placed '...' in rule: ( ...
 unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
-title "parse: Badly placed '|' (outside paren)"
+title 'parse `|`: `|` not allowed outside paren or bracket'
 INPUT='|'
 parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
 is "$RC"           '1'                                 'Return value'
@@ -45,7 +45,7 @@ is "$(cat stderr)" "$BIN: Badly placed '|' in rule: |
 unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
-title "parse: One ')' too many"
+title 'parse `A)`: Too many end paren'
 INPUT='A )'
 parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
 is "$RC"           '1'                                     'Return value'
@@ -53,7 +53,7 @@ is "$(cat stderr)" "$BIN: Too many ')' in rule: A )"       'Error message'
 unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
-title "parse: One ']' too many"
+title 'parse `A]`: Too many end brackets'
 INPUT='A ]'
 parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
 is "$RC"           '1'                                     'Return value'
@@ -61,7 +61,7 @@ is "$(cat stderr)" "$BIN: Too many ']' in rule: A ]"       'Error message'
 unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
-title "parse: Missing ')'"
+title 'parse `[A)`: Missing end bracket'
 INPUT='[ A )'
 parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
 is "$RC"           '1'                                     'Return value'
@@ -69,7 +69,7 @@ is "$(cat stderr)" "$BIN: Missing ')' in rule (group 1): [ A )" 'Error message'
 unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
-title "parse: Missing ']'"
+title 'parse `(A]`: Missing end paren'
 INPUT='( A ]'
 parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
 is "$RC"           '1'                                     'Return value'
@@ -77,7 +77,7 @@ is "$(cat stderr)" "$BIN: Missing ']' in rule (group 1): ( A ]" 'Error message'
 unset INPUT GOTTED_RULES RC
 
 cd "$(mktemp -d)"
-title "parse: Missing ']'"
+title 'parse `(A`: Missing end paren'
 INPUT='( A'
 parse GOTTED_RULES "$INPUT" 2>stderr && :; RC="$?" # intentionally unquoted
 is "$RC"           '1'                                     'Return value'
@@ -86,7 +86,7 @@ unset INPUT GOTTED_RULES RC
 
 ###############################################################################
 
-title "parse: normal operation"
+title 'parse `[[A] B]`'
 INPUT='  [   [   A   ]   B   ]'
 LEVEL='0 [ 1 [ 2 A 2 ] 1 B 1 ] 0'
 GROUP='0 [ 1 [ 2 A 2 ] 1 B 1 ] 0'
@@ -104,7 +104,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A [B]]`'
 INPUT='  [   A   [   B   ]   ]'
 LEVEL='0 [ 1 A 1 [ 2 B 2 ] 1 ] 0'
 GROUP='0 [ 1 A 1 [ 2 B 2 ] 1 ] 0'
@@ -121,7 +121,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A] [B [C] [D]]`'
 INPUT='  [   A   ]   [   B   [   C   ]   [   D   ]   ]'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 [ 2 C 2 ] 1 [ 2 D 2 ] 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 [ 3 C 3 ] 2 [ 4 D 4 ] 2 ] 0'
@@ -143,7 +143,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A]`'
 INPUT='  [   A   ]'
 LEVEL='0 [ 1 A 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0'
@@ -159,7 +159,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A] B`'
 INPUT='  [   A   ]   B'
 LEVEL='0 [ 1 A 1 ] 0 B 0'
 GROUP='0 [ 1 A 1 ] 0 B 0'
@@ -176,7 +176,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A] [B] C`'
 INPUT='  [   A   ]   [   B   ]   C'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 ] 0 C 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 ] 0 C 0'
@@ -196,7 +196,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A] B [C] `'
 INPUT='  [   A   ]   B   [   C   ]  '
 LEVEL='0 [ 1 A 1 ] 0 B 0 [ 1 C 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 B 0 [ 2 C 2 ] 0'
@@ -215,7 +215,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A|B] C [D|E] `'
 INPUT='  [   A   |   B   ]   C   [   D   |   E   ]  '
 LEVEL='0 [ 1 A 1 | 1 B 1 ] 0 C 0 [ 1 D 1 | 1 E 1 ] 0'
 GROUP='0 [ 1 A 1 | 1 B 1 ] 0 C 0 [ 2 D 2 | 2 E 2 ] 0'
@@ -236,7 +236,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A] [B] [C]`'
 INPUT='  [   A   ]   [   B   ]   [   C   ]'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 ] 0 [ 1 C 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 ] 0 [ 3 C 3 ] 0'
@@ -259,7 +259,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A] [B] [C|D]`'
 INPUT='  [   A   ]   [   B   ]   [   C   |   D   ]'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 ] 0 [ 1 C 1 | 1 D 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 ] 0 [ 3 C 3 | 3 D 3 ] 0'
@@ -286,7 +286,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A] [B [C] [D]]`'
 INPUT='  [   A   ]   [   B   [   C   ]   [   D   ]   ]'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 [ 2 C 2 ] 1 [ 2 D 2 ] 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 [ 3 C 3 ] 2 [ 4 D 4 ] 2 ] 0'
@@ -308,7 +308,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A] [B]`'
 INPUT='  [   A   ]   [   B   ]'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 ] 0'
@@ -327,7 +327,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A] (B)`'
 INPUT='  [   A   ]   (   B   )'
 LEVEL='0 [ 1 A 1 ] 0 ( 1 B 1 ) 0'
 GROUP='0 [ 1 A 1 ] 0 ( 2 B 2 ) 0'
@@ -344,7 +344,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A) [B]`'
 INPUT='  (   A   )   [   B   ]'
 LEVEL='0 ( 1 A 1 ) 0 [ 1 B 1 ] 0'
 GROUP='0 ( 1 A 1 ) 0 [ 2 B 2 ] 0'
@@ -361,7 +361,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[a] [[b] c]`'
 INPUT='  [   a   ]   [   [   b   ]   c   ]'
 LEVEL='0 [ 1 a 1 ] 0 [ 1 [ 2 b 2 ] 1 c 1 ] 0'
 GROUP='0 [ 1 a 1 ] 0 [ 2 [ 3 b 3 ] 2 c 2 ] 0'
@@ -383,7 +383,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[a] [[b] [c] d]`'
 INPUT='  [   a   ]   [   [   b   ]   [   c   ]   d   ]'
 LEVEL='0 [ 1 a 1 ] 0 [ 1 [ 2 b 2 ] 1 [ 2 c 2 ] 1 d 1 ] 0'
 GROUP='0 [ 1 a 1 ] 0 [ 2 [ 3 b 3 ] 2 [ 4 c 4 ] 2 d 2 ] 0'
@@ -409,7 +409,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A] [B]`'
 INPUT='  [   A   ]   [   B   ]'
 LEVEL='0 [ 1 A 1 ] 0 [ 1 B 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0 [ 2 B 2 ] 0'
@@ -428,7 +428,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A B C|D E F|G H I]... X`'
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...   X'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
@@ -456,7 +456,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `A`'
 INPUT='  A'
 LEVEL='0 A 0'
 GROUP='0 A 0'
@@ -471,7 +471,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `A B`'
 INPUT='  A   B'
 LEVEL='0 A 0 B 0'
 GROUP='0 A 0 B 0'
@@ -487,7 +487,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A B)`'
 INPUT='  (   A   B   )'
 LEVEL='0 ( 1 A 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 B 1 ) 0'
@@ -503,7 +503,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A B)...`'
 INPUT='  (   A   B   ) ...'
 LEVEL='0 ( 1 A 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 B 1 ) 0 ... 0'
@@ -520,7 +520,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A) B`'
 INPUT='  (   A   )   B'
 LEVEL='0 ( 1 A 1 ) 0 B 0'
 GROUP='0 ( 1 A 1 ) 0 B 0'
@@ -536,7 +536,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A...)...`'
 # FIXME: '(X...)...' doesn't make sense. Should it be forbidden?
 # (Right now two identical rules are generated, which is weird but okay.)
 INPUT='  (   A   ...   )   ...'          # Does this make sense?
@@ -555,7 +555,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A...|B)...`'
 INPUT='  (   A   ...   |   B   )   ...'
 LEVEL='0 ( 1 A 1 ... 1 | 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ... 1 | 1 B 1 ) 0 ... 0'
@@ -566,7 +566,6 @@ RULES='0 1 A
 1 1 A
 1 1 B
 1 x'
-title "parse: FIXME Why does '1 1 A' exist twice in above rules?"
 # One would expect these rules instead
 # RULES='0 1 A
 # 1 1 A
@@ -581,7 +580,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A)... B`'
 INPUT='  (   A   )   ...   B'
 LEVEL='0 ( 1 A 1 ) 0 ... 0 B 0'
 GROUP='0 ( 1 A 1 ) 0 ... 0 B 0'
@@ -598,7 +597,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `A (B)`'
 INPUT='  A   (   B   )'
 LEVEL='0 A 0 ( 1 B 1 ) 0'
 GROUP='0 A 0 ( 1 B 1 ) 0'
@@ -614,7 +613,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `A (B)...`'
 INPUT='  A   (   B   ) ...'
 LEVEL='0 A 0 ( 1 B 1 ) 0 ... 0'
 GROUP='0 A 0 ( 1 B 1 ) 0 ... 0'
@@ -631,7 +630,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A) (B)`'
 INPUT='  (   A   )   (   B   )'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
@@ -647,7 +646,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A)... (B)`'
 INPUT='  (   A   )   ...   (   B   )'
 LEVEL='0 ( 1 A 1 ) 0 ... 0 ( 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0 ... 0 ( 2 B 2 ) 0'
@@ -664,7 +663,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A) (B)...`'
 INPUT='  (   A   )   (   B   )   ...'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0 ... 0'
@@ -681,7 +680,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A)... (B)...`'
 INPUT='  (   A   )   ...   (   B   )   ...'
 LEVEL='0 ( 1 A 1 ) 0 ... 0 ( 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ) 0 ... 0 ( 2 B 2 ) 0 ... 0'
@@ -699,7 +698,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `((A) B)`'
 INPUT='  (   (   A   )   B   )'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
 GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0'
@@ -715,7 +714,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A (B))`'
 INPUT='  (   A   (   B   )   )'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
 GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0'
@@ -731,7 +730,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A (B (C)))`'
 INPUT='  (   A   (   B   (   C   )   )   )'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0'
 GROUP='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0'
@@ -748,7 +747,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A B C|D E F|G H I) X`'
 INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   X'
 LEVEL='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 X 0'
 GROUP='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 X 0'
@@ -772,7 +771,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A B C|D E F|G H I] X`'
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   X'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 X 0'
@@ -797,7 +796,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A B C|D E F|G H I]... X`'
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]   ...   X'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0 X 0'
@@ -825,7 +824,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A)`'
 INPUT='  (   A   )'
 LEVEL='0 ( 1 A 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0'
@@ -840,7 +839,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `((A B))`'
 INPUT='  (   (   A   B   )   )'
 LEVEL='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
 GROUP='0 ( 1 ( 2 A 2 B 2 ) 1 ) 0'
@@ -856,7 +855,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `[A]`'
 INPUT='  [   A   ]'
 LEVEL='0 [ 1 A 1 ] 0'
 GROUP='0 [ 1 A 1 ] 0'
@@ -872,7 +871,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A|B)`'
 INPUT='  (   A   |   B   )'
 LEVEL='0 ( 1 A 1 | 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 | 1 B 1 ) 0'
@@ -888,7 +887,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A|B)...`'
 INPUT='  (   A   |   B   )   ...'
 LEVEL='0 ( 1 A 1 | 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 | 1 B 1 ) 0 ... 0'
@@ -906,7 +905,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `A... B`'
 INPUT='  A   ...   B'
 LEVEL='0 A 0 ... 0 B 0'
 GROUP='0 A 0 ... 0 B 0'
@@ -923,7 +922,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A)... B`'
 INPUT='  (   A   ) ... B'
 LEVEL='0 ( 1 A 1 ) 0 ... 0 B 0'
 GROUP='0 ( 1 A 1 ) 0 ... 0 B 0'
@@ -940,7 +939,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A B)...`'
 INPUT='  (   A   B   )   ...'
 LEVEL='0 ( 1 A 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 B 1 ) 0 ... 0'
@@ -957,7 +956,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A) (B)`'
 INPUT='  (   A   )   (   B   )'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0'
 GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0'
@@ -973,7 +972,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A) (B)...`'
 INPUT='  (   A   )   (   B   )   ...'
 LEVEL='0 ( 1 A 1 ) 0 ( 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ) 0 ( 2 B 2 ) 0 ... 0'
@@ -990,7 +989,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A (B))...`'
 INPUT='  (   A   (   B   )   )   ...'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ( 2 B 2 ) 1 ) 0 ... 0'
@@ -1007,7 +1006,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `((A) B)...`'
 INPUT='  (   (   A   )   B   )   ...'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 ( 2 A 2 ) 1 B 1 ) 0 ... 0'
@@ -1024,7 +1023,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(((A) B) C)...`'
 INPUT='  (   (   (   A   )   B   )   C   )   ...'
 LEVEL='0 ( 1 ( 2 ( 3 A 3 ) 2 B 2 ) 1 C 1 ) 0 ... 0'
 GROUP='0 ( 1 ( 2 ( 3 A 3 ) 2 B 2 ) 1 C 1 ) 0 ... 0'
@@ -1042,7 +1041,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(((A)... B) C)...`'
 INPUT='  (   (   (   A   )   ...   B   )   C   )   ...'
 LEVEL='0 ( 1 ( 2 ( 3 A 3 ) 2 ... 2 B 2 ) 1 C 1 ) 0 ... 0'
 GROUP='0 ( 1 ( 2 ( 3 A 3 ) 2 ... 2 B 2 ) 1 C 1 ) 0 ... 0'
@@ -1061,7 +1060,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `((A)... B)`'
 INPUT='  (   (   A   )   ...   B   )'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 ... 1 B 1 ) 0'
 GROUP='0 ( 1 ( 2 A 2 ) 1 ... 1 B 1 ) 0'
@@ -1078,7 +1077,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `((A)... B)...`'
 INPUT='  (   (   A   )   ...   B   )   ...'
 LEVEL='0 ( 1 ( 2 A 2 ) 1 ... 1 B 1 ) 0 ... 0'
 GROUP='0 ( 1 ( 2 A 2 ) 1 ... 1 B 1 ) 0 ... 0'
@@ -1096,7 +1095,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: normal operation"
+title 'parse `(A (B (C)))...`'
 INPUT='  (   A   (   B   (   C   )   )   )   ...'
 LEVEL='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 ( 2 B 2 ( 3 C 3 ) 2 ) 1 ) 0 ... 0'
@@ -1116,7 +1115,7 @@ unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 ######################################################################
 
-title "parse: Tests from Images of Finite State Automaton (4 tests)"
+title 'parse `(A B C|D E F|G H I)`: Tests from Images of Finite State Automaton (4 tests)'
 INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )'
 LEVEL='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0'
 GROUP='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0'
@@ -1139,7 +1138,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: Tests from Images of Finite State Automaton (4 tests)"
+title 'parse `[A B C|D E F|G H I]`: Tests from Images of Finite State Automaton (4 tests)'
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ]'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0'
@@ -1163,7 +1162,7 @@ is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
 is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
-title "parse: Tests from Images of Finite State Automaton (4 tests)"
+title 'parse `(A B C|D E F|G H I)...`: Tests from Images of Finite State Automaton (4 tests)'
 INPUT='  (   A   B   C   |   D   E   F   |   G   H   I   )   ...'
 LEVEL='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 ... 0'
 GROUP='0 ( 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ) 0 ... 0'
@@ -1190,7 +1189,7 @@ is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
-title "parse: Tests from Images of Finite State Automaton (4 tests)"
+title 'parse `[A B C|D E F|G H I]...`: Tests from Images of Finite State Automaton (4 tests)'
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ] ...'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0'
@@ -1229,7 +1228,7 @@ is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
-title "parse: '...' (after word) inside end of parentheses"
+title 'parse `(A|B...)`: `...` (after word) inside end of parentheses'
 INPUT='  (   A   |   B   ...   )'
 LEVEL='0 ( 1 A 1 | 1 B 1 ... 1 ) 0'
 GROUP='0 ( 1 A 1 | 1 B 1 ... 1 ) 0'
@@ -1258,7 +1257,7 @@ is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
-title "parse: '...' (after paren group) inside end of parentheses"
+title 'parse `(A|(B)...)`: `...` (after paren group) inside end of parentheses'
 INPUT='  (   A   |   (   B   )   ...   )'
 LEVEL='0 ( 1 A 1 | 1 ( 2 B 2 ) 1 ... 1 ) 0'
 GROUP='0 ( 1 A 1 | 1 ( 2 B 2 ) 1 ... 1 ) 0'
@@ -1288,7 +1287,7 @@ is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
-title "parse: '...' (after bracket group) inside end of parentheses"
+title 'parse `(A|[B]...)`: `...` (after bracket group) inside end of parentheses'
 INPUT='  (   A   |   [   B   ]   ...   )'
 LEVEL='0 ( 1 A 1 | 1 [ 2 B 2 ] 1 ... 1 ) 0'
 GROUP='0 ( 1 A 1 | 1 [ 2 B 2 ] 1 ... 1 ) 0'
@@ -1315,7 +1314,7 @@ is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
-title "parse: normal operation"
+title 'parse `(ship HERE1|HERE2|-h|--help|--version)`'
 INPUT='  (   ship   HERE1   |   HERE2   |   -h   |   --help   |   --version   )'
 LEVEL='0 ( 1 ship 1 HERE1 1 | 1 HERE2 1 | 1 -h 1 | 1 --help 1 | 1 --version 1 ) 0'
 GROUP='0 ( 1 ship 1 HERE1 1 | 1 HERE2 1 | 1 -h 1 | 1 --help 1 | 1 --version 1 ) 0'
@@ -1345,17 +1344,16 @@ unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 # HERE1=
 # HERE2= mine (set|remove) X Y [--moored|--drifting]
 
-title "parse"
+cd "$(mktemp -d)"
+title 'parse `(new NAME...|NAME move X Y [--speed=KN]|shoot X Y)`:'
 INPUT='  (   new   NAME   ...   |   NAME   move   X   Y   [   --speed=KN   ]   |   shoot   X   Y   )'
 LEVEL='0 ( 1 new 1 NAME 1 ... 1 | 1 NAME 1 move 1 X 1 Y 1 [ 2 --speed=KN 2 ] 1 | 1 shoot 1 X 1 Y 1 ) 0'
 GROUP='0 ( 1 new 1 NAME 1 ... 1 | 1 NAME 1 move 1 X 1 Y 1 [ 2 --speed=KN 2 ] 1 | 1 shoot 1 X 1 Y 1 ) 0'
 STATE='0 ( 0 new 2 NAME 1 ... 1 | 0 NAME 4 move 5 X 6 Y 7 [ 7 --speed=KN 8 ] 8 | 0 shoot 9 X 10 Y 8 ) 8'  ## << EXPECTED BAD STATE
-
+#
 # TWO problems
 # * '...' needs to look ahead to get possible group endstate
-
-cd "$(mktemp -d)"
-title "parse"
+#
 #STATE='0 ( 0 new 2 NAME 1 ... 1 | 0 NAME 4 move 5 X 6 Y 7 [ 7 --speed=KN   ] 1 | 0 shoot 9 X 10 Y 1 ) 1'
 #STATE='0 ( 0 new 2 NAME 8 ... 8 | 0 NAME 4 move 5 X 6 Y 7 [ 7 --speed=KN 8 ] 8 | 0 shoot 9 X 10 Y 8 ) 8'
 RULES=''
@@ -1381,7 +1379,7 @@ unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 ###############################################################################
 
 cd "$(mktemp -d)"
-title "parse"
+title 'parse `[A B C|D E F|G H I]...`:'
 INPUT='  [   A   B   C   |   D   E   F   |   G   H   I   ] ...'
 LEVEL='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0'
 GROUP='0 [ 1 A 1 B 1 C 1 | 1 D 1 E 1 F 1 | 1 G 1 H 1 I 1 ] 0 ... 0'
@@ -1412,9 +1410,8 @@ unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 # HERE1= ( new NAME... | NAME move X Y [--speed=KN] | shoot X Y )
 # HERE2= mine (set|remove) X Y [--moored|--drifting]
 
-title "parse"
+title 'parse: `(ship (new NAME...|NAME move X Y [--speed=KN]|shoot X Y)|mine (set|remove) X Y [--moored|--drifting]|-h|--help|--version)'
 INPUT='  (   ship   (   new   NAME   ...   |   NAME   move   X   Y   [   --speed=KN   ]   |   shoot   X   Y   )   |   mine   (   set   |   remove   )   X   Y   [   --moored   |   --drifting   ]   |   -h   |   --help   |   --version   )'
-
 GROUP='0 ( 1 ship 1 ( 2 new 2 NAME 2 ... 2 | 2 NAME 2 move 2 X 2 Y 2 [ 3 --speed=KN 3  ] 2  | 2 shoot 2 X 2 Y 2 ) 1 | 1 mine 1 ( 4 set 4 | 4 remove 4 ) 1 X 1 Y 1 [ 5 --moored 5 | 5 --drifting 5 ] 1 | 1 -h 1 | 1 --help 1 | 1 --version 1 ) 0'
 LEVEL='0 ( 1 ship 1 ( 2 new 2 NAME 2 ... 2 | 2 NAME 2 move 2 X 2 Y 2 [ 3 --speed=KN 3  ] 2  | 2 shoot 2 X 2 Y 2 ) 1 | 1 mine 1 ( 2 set 2 | 2 remove 2 ) 1 X 1 Y 1 [ 2 --moored 2 | 2 --drifting 2 ] 1 | 1 -h 1 | 1 --help 1 | 1 --version 1 ) 0'
 STATE='0 ( 0 ship 2 ( 2 new   NAME   ...   | 2 NAME   move   X   Y   [   --speed=KN    ]    | 2 shoot    X    Y   ) 1 | 0 mine    (    set    |    remove    )    X    Y    [    --moored    |    --drifting    ] 1  | 0 -h 1 | 0 --help 1 | 0 --version 1 ) 1'
