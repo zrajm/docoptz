@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright (C) 2020-2023 zrajm <docoptz@zrajm.org>
-# Licensed under GNU GPL version 2, see LICENSE-GPL2.txt for details.
+# License: GPLv2 [https://gnu.org/licenses/gpl-2.0.txt]
 
 out() { printf '%s\n' "$*"; }
 warn() {
@@ -134,32 +134,51 @@ appendnl() {
 }\$2\""                                        # intentional newline
 }
 
-# Usage: readdoc VARNAME <FILE
+# trimleft VARNAME [STR]
 #
-# Extract the doc string from a block of text passed on standard input, and
-# return it in the variable VARNAME. Return false if VARNAME is not a valid
-# variable name, or if no input was provided on stdin. The first chunk of
-# contiguous lines which starts with `# ` in the input are considered the
-# docstring. Docstring is terminated by the first line not starting with `# `,
-# and may be preceeded by non-docstring lines. Empty lines (containing a single
-# `#`) are also allowed within the docstring (and result in an empty line in
-# the output). Shebang lines (starting with `#!`) does not terminate the
-# docstring, but not included in the output either.
+# Strip all occurences of STR off of the left end of VARNAME. If no STR is
+# given, will strip off all whitespace characters found in $IFS. STR may be
+# multiple characters (`XY`), or even a Shell `case` type "character class"
+# (`[XY]` or `[!XY]`).
+trimleft() {
+    eval "set -- \"\$1\" \"\${2:-[$IFS]}\" \"\${$1}\"" # put $VARNAME in $3
+    while [ "$3" != "${3#$2}" ]; do
+        set -- "$1" "$2" "${3#$2}"
+    done
+    setvar "$1" "$3" || return 1
+}
+
+# Usage: gethelp VARNAME <FILE
 #
-# Typically invoked with `readdoc varname <"$0"`
-readdoc() {
-    local _
-    [ -t 0 ] && warn "readdoc: Missing input on STDIN" && return 1
-    ok_varname "$1" readdoc || return 1
-    setvar "$1" ''
-    while IFS='' read -r _; do
+# Set variable named VARNAME to the first 'Usage:' description found in FILE.
+# Returns false if VARNAME is an invalid variable name, or if no usage string
+# could be found. A usage string starts with `# Usage:` (case insensitive) and
+# ends with the first blank or non-comment line. Each line of the usage string
+# must start with `# `, except for empty lines which may consist of a single
+# `#`.
+#
+# Typically invoked with `gethelp varname <"$0"`
+#
+# FIXME: Make agnostic as to the number of `#` and space at beginning of line.
+gethelp() {
+    if [ -t 0 ]; then warn "gethelp: Missing input on STDIN"; return 1; fi
+    local _ IFS='
+';  set -- "$1"                                # intentional newline
+    while read -r _; do
+        if [ "$#" -eq 1 ]; then
+            case "$_" in
+                '# '[Uu][Ss][Aa][Gg][Ee]:*) set -- "$1" "${_#\# }"
+            esac
+            continue
+        fi
         case "$_" in
-            '#!'*) :;;                         # ignore shebang
-            '#')   appendnl "$1" '' ;;         # blank line
-            '# '*) appendnl "$1" "${_#\# }" ;; # docstring
-            *)  ifvar "$1" && break ;;         # terminate docstring
+            '#')   set -- "$1" "$2$IFS" ;;     # blank line
+            '# '*) set -- "$1" "$2$IFS${_#\# }" ;; # docstring
+            ''|[!#]*) break
         esac
     done
+    if [ "$#" -eq 1 ]; then warn "gethelp: No help message found"; return 1; fi
+    setvar "$1" "$2" || return 1
 }
 
 # Usage: replace VARNAME OLDSTR NEWSTR

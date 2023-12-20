@@ -1,0 +1,64 @@
+#!/bin/dash
+# Copyright (C) 2023 zrajm <docoptz@zrajm.org>
+# License: GPLv2 [https://gnu.org/licenses/gpl-2.0.txt]
+
+# Usage: merpstore [OPTION]... [list]
+#        merpstore [OPTION]... get KEY...
+#        merpstore [OPTION]... set (KEY VALUE)...
+# Get, set, or (without args) list values in a merp key/value store.
+#
+# Options:
+#   -c,--color[=(yes|no|auto)]  Colorize the output (default: 'yes')
+#                               (default without option is 'auto')
+#   -f,--file=NAME              File to read (default: ~/.merpstorerc)
+#   -h,--help                   Display this help and exit
+#   -V,--version                Output version information and exit
+
+BIN="$(readlink -f "$0")"
+. "${BIN%/*}/docoptz.sh"
+
+
+# trimleft VARNAME [STR]
+#
+# Strip all occurences of STR off of the left end of VARNAME. If no STR is
+# given, will strip off all whitespace characters found in $IFS. STR may be
+# multiple characters (`XY`), or even a Shell `case` type "character class"
+# (`[XY]` or `[!XY]`).
+trimleft() {
+    eval "set -- \"\$1\" \"\${2:-[$IFS]}\" \"\${$1}\"" # put $VARNAME in $3
+    while [ "$3" != "${3#$2}" ]; do
+        set -- "$1" "$2" "${3#$2}"
+    done
+    setvar "$1" "$3" || return 1
+}
+
+# getusage VARNAME HELPMSG
+getusage() {
+    local _HELPMSG="$2" _ _BINNAME="${0##*/}" _USAGE=''
+    trimleft _HELPMSG '[Uu][Ss][Aa][Gg][Ee]:'  # strip 'usage:'
+    trimleft _HELPMSG '
+'                                              # strip newline(s)
+    while IFS='' read -r _; do
+        case "$_" in ''|[!"$IFS"]*) break; esac # stop on blank or unindented
+        trimleft _
+        case "$_" in
+            "$_BINNAME "*) _USAGE="$_USAGE${_USAGE:+|}${_#$_BINNAME }" ;;
+            *)             _USAGE="$_USAGE $_" ;;
+        esac
+        # Error unless 1st line have usage example.
+        if [ -z "$_USAGE" ]; then
+            warn "docopt: 'Usage:' part of \`--help\` text must start with '$_BINNAME'"
+            return 1
+        fi
+    done <<-END_HELP
+		$_HELPMSG
+	END_HELP
+    setvar "$1" "($_USAGE)" || return 1
+}
+
+gethelp HELPMSG <"$BIN"
+getusage   USAGE "$HELPMSG"
+
+echo "Usage: $USAGE"
+
+#[eof]

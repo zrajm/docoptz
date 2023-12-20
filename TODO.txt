@@ -20,7 +20,7 @@
    Are these the Google Note images I drew on my phone? To find the comment
    referring to this search for 'purple' in `docoptz.sh`.
 ** TODO Explain the inner workings of the code better
-* [1/19] `docoptz.sh` (Dash version)
+* [3/22] `docoptz.sh` (Dash version)
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
    :END:
@@ -84,8 +84,9 @@
     another group. This is WRONG as each alternative of a group (in this case
     the first parenthesis/bracket group) MUST always end in the same state
     number.
-** [0/3] Glue all the things together into usable whole
-*** TODO What else is missing
+** [2/6] Glue all the things together into usable whole
+*** DONE Sourcing
+    CLOSED: [2023-12-20 Wed 08:40]
     How should this code be executed? Simplest interface is prolly something
     like:
 
@@ -97,6 +98,10 @@
     This also goes well with just copying the whole Docoptz source into the
     beginning of a shell script that uses it (so that all source can be
     included in just one file).
+*** DONE Reading usage patterns
+    CLOSED: [2023-12-20 Wed 08:40]
+*** TODO Create test cases for gethelp() and getoptions()
+*** TODO Reading options
 *** TODO Write function which RULES -> eval:able code
     There should be a function returning a valid FSA executer as a string that
     can be eval:ed. E.g. something like this:
