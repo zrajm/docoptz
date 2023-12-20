@@ -107,10 +107,10 @@ RULES='0 2 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A [B]]`'
@@ -124,10 +124,10 @@ RULES='0 2 A
 3 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A] [B [C] [D]]`'
@@ -146,10 +146,10 @@ RULES='0 1 A
 5 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A]`'
@@ -162,10 +162,10 @@ RULES='0 1 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A] B`'
@@ -179,10 +179,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A] [B] C`'
@@ -199,10 +199,10 @@ RULES='0 1 A
 3 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A] B [C] `'
@@ -218,10 +218,10 @@ RULES='0 1 A
 3 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A|B] C [D|E] `'
@@ -239,10 +239,10 @@ RULES='0 1 A
 3 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A] [B] [C]`'
@@ -262,10 +262,10 @@ RULES='0 1 A
 3 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A] [B] [C|D]`'
@@ -288,10 +288,10 @@ RULES='0 1 A
 3 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A] [B [C] [D]]`'
@@ -310,10 +310,10 @@ RULES='0 1 A
 5 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A] [B]`'
@@ -329,10 +329,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A] (B)`'
@@ -346,10 +346,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A) [B]`'
@@ -363,10 +363,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[a] [[b] c]`'
@@ -385,10 +385,10 @@ RULES='0 1 a
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[a] [[b] [c] d]`'
@@ -411,10 +411,10 @@ RULES='0 1 a
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A] [B]`'
@@ -430,10 +430,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A B C|D E F|G H I]... X`'
@@ -458,10 +458,10 @@ RULES='0 2 A
 8 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `A`'
@@ -473,10 +473,10 @@ RULES='0 1 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `A B`'
@@ -489,10 +489,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A B)`'
@@ -505,10 +505,10 @@ RULES='0 2 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A B)...`'
@@ -522,10 +522,10 @@ RULES='0 2 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A) B`'
@@ -538,10 +538,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 # FIXME: This input should result in a parse error as the duplicated `...` does
@@ -557,10 +557,10 @@ RULES='0 1 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 # This actually DOES make sense (as opposed to above variant `(A...)...`)
@@ -581,10 +581,10 @@ RULES='0 2 xx
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[xx A...]...`: (ellipsis allowed before and after ending bracket)'
@@ -600,10 +600,10 @@ RULES='0 2 xx
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 # FIXME: This input should result in a parse error as the duplicated `...` does
@@ -623,10 +623,10 @@ RULES='0 1 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A)... B`'
@@ -640,10 +640,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `A (B)`'
@@ -656,10 +656,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `A (B)...`'
@@ -673,10 +673,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A) (B)`'
@@ -689,10 +689,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A)... (B)`'
@@ -706,10 +706,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A) (B)...`'
@@ -723,10 +723,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A)... (B)...`'
@@ -741,10 +741,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `((A) B)`'
@@ -757,10 +757,10 @@ RULES='0 2 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A (B))`'
@@ -773,10 +773,10 @@ RULES='0 2 A
 3 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A (B (C)))`'
@@ -790,10 +790,10 @@ RULES='0 2 A
 5 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A B C|D E F|G H I) X`'
@@ -814,10 +814,10 @@ RULES='0 2 A
 8 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A B C|D E F|G H I] X`'
@@ -839,10 +839,10 @@ RULES='0 2 A
 8 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A B C|D E F|G H I]... X`'
@@ -867,10 +867,10 @@ RULES='0 2 A
 8 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A)`'
@@ -882,10 +882,10 @@ RULES='0 1 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `((A B))`'
@@ -898,10 +898,10 @@ RULES='0 3 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A]`'
@@ -914,10 +914,10 @@ RULES='0 1 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A|B)`'
@@ -930,10 +930,10 @@ RULES='0 1 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A|B)...`'
@@ -948,10 +948,10 @@ RULES='0 1 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `A... B`'
@@ -965,10 +965,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A)... B`'
@@ -982,10 +982,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A B)...`'
@@ -999,10 +999,10 @@ RULES='0 2 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A) (B)`'
@@ -1015,10 +1015,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A) (B)...`'
@@ -1032,10 +1032,10 @@ RULES='0 1 A
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A (B))...`'
@@ -1049,10 +1049,10 @@ RULES='0 2 A
 3 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `((A) B)...`'
@@ -1066,10 +1066,10 @@ RULES='0 2 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(((A) B) C)...`'
@@ -1084,10 +1084,10 @@ RULES='0 3 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(((A)... B) C)...`'
@@ -1103,10 +1103,10 @@ RULES='0 3 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `((A)... B)`'
@@ -1120,10 +1120,10 @@ RULES='0 2 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `((A)... B)...`'
@@ -1138,10 +1138,10 @@ RULES='0 2 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A (B (C)))...`'
@@ -1156,10 +1156,10 @@ RULES='0 2 A
 5 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 ######################################################################
@@ -1181,10 +1181,10 @@ RULES='0 2 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `[A B C|D E F|G H I]`: Tests from Images of Finite State Automaton (4 tests)'
@@ -1205,10 +1205,10 @@ RULES='0 2 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 title 'parse `(A B C|D E F|G H I)...`: Tests from Images of Finite State Automaton (4 tests)'
@@ -1231,10 +1231,10 @@ RULES='0 2 A
 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
@@ -1269,11 +1269,11 @@ dumpenv \
     GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
+is_same_env : "Variable leakage" 3<env1.txt 4<env2.txt
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
@@ -1298,11 +1298,11 @@ dumpenv \
     GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
+is_same_env : "Variable leakage" 3<env1.txt 4<env2.txt
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 # FIXME: Incorrect state numbering. (See 'bad-state-numbers' in TODO.txt)
@@ -1335,11 +1335,11 @@ dumpenv \
     GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
+is_same_env : "Variable leakage" 3<env1.txt 4<env2.txt
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 # FIXME: Incorrect state numbering. (See 'bad-state-numbers' in TODO.txt)
@@ -1373,11 +1373,11 @@ dumpenv \
     GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
+is_same_env : "Variable leakage" 3<env1.txt 4<env2.txt
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
@@ -1405,11 +1405,11 @@ dumpenv \
     GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
+is_same_env : "Variable leakage" 3<env1.txt 4<env2.txt
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 ###############################################################################
@@ -1434,10 +1434,10 @@ RULES='0 1 a
 11 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
@@ -1452,10 +1452,10 @@ RULES='0 1 a
 2 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
@@ -1472,10 +1472,10 @@ RULES='0 1 a
 4 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
@@ -1492,10 +1492,10 @@ RULES='0 2 b
 4 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 # FIXME: Incorrect state numbering. (See 'bad-state-numbers' in TODO.txt)
@@ -1522,10 +1522,10 @@ RULES='0 2 b
 # 4 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 # FIXME: Incorrect state numbering. (See 'bad-state-numbers' in TODO.txt)
@@ -1552,10 +1552,10 @@ RULES='0 1 a
 # 4 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 # FIXME: Incorrect state numbering. (See 'bad-state-numbers' in TODO.txt)
@@ -1604,11 +1604,11 @@ dumpenv \
     GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
+is_same_env : "Variable leakage" 3<env1.txt 4<env2.txt
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 cd "$(mktemp -d)"
@@ -1643,11 +1643,11 @@ dumpenv \
     GOTTED_RULES RC TESTS_COUNT TEST_OUT FAILED_TESTS TMPNUM \
     >env2.txt # got
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
-is_same_env : "Variable leakage: '$INPUT'" 3<env1.txt 4<env2.txt
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
+is_same_env : "Variable leakage" 3<env1.txt 4<env2.txt
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 # FIXME: Incorrect state numbering. (See 'bad-state-numbers' in TODO.txt)
@@ -1710,10 +1710,10 @@ RULES='0 2 ship
 # 1 x'
 parse GOTTED_RULES "$INPUT" && :; RC="$?"  # intentionally unquoted
 is "$RC"           '0'      'Return value'
-is "$_DEBUG_LEVEL" "$LEVEL" "Bracket level: '$INPUT'"
-is "$_DEBUG_GROUP" "$GROUP" "Group numbers: '$INPUT'"
-is "$_DEBUG_STATE" "$STATE" "State numbers: '$INPUT'"
-is "$GOTTED_RULES" "$RULES"         "Rules: '$INPUT'"
+is "$_DEBUG_LEVEL" "$LEVEL" 'Bracket level'
+is "$_DEBUG_GROUP" "$GROUP" 'Group numbers'
+is "$_DEBUG_STATE" "$STATE" 'State numbers'
+is "$GOTTED_RULES" "$RULES" 'Rules'
 unset INPUT LEVEL GROUP STATE RULES GOTTED_RULES RC
 
 done_testing
