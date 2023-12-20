@@ -2,6 +2,9 @@
 
 * [0/5] `t/*.t` (Test suite)
 ** TODO Fix tests in `t/parse.t`
+*** TODO Test for `(xx A...)...`
+    The `(A...)...` test leads to a doubled rule in the outputted FSA, which is
+    kinda silly. But this should work just fine here. No?
 ** TODO Add tests for prefix() function
 ** TODO Test cases making sure that `set -e` works
 ** TODO Test cases making sure that `set -u` works
@@ -17,11 +20,116 @@
    Are these the Google Note images I drew on my phone? To find the comment
    referring to this search for 'purple' in `docoptz.sh`.
 ** TODO Explain the inner workings of the code better
-* [1/13] `docoptz.sh` (Dash version)
+* [1/19] `docoptz.sh` (Dash version)
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
    :END:
 ** TODO Finish the grammar parsing
+*** TODO Disallow empty parentheses/brackets and empty subgroups
+    I.e. pipe should not be allowed immediately after pipe or start
+    parenthesis/bracket, i.e. not `||`, `(|` or `[|`.
+
+    End parenthesis/bracket should not be allowed immediately after pipe, or
+    start parenthesis/bracket, i.e. not `|)`, `()`, or `|]`, `[]`.
+
+    And probably not even: `(]` and `[)`.
+
+    Make sure there are test cases for all of these errors!
+*** TODO Disallow non-differentiated branches
+    :PROPERTIES:
+    :CUSTOM_ID: dissallow-non-differentiated-branches
+    :END:
+    See for example test `(A...|B)...`.
+
+    Here `A` and `B` both accept any value. so there is nothing to
+    differentiate the two branches initially. This should not be allowed.
+*** TODO Disallow duplicate rules in output FSA
+    :PROPERTIES:
+    :CUSTOM_ID: dissallow-duplicate-rules
+    :END:
+    E.g. Using `(X...)...` produces doubled rules in the FSA output, creating a
+    non-deterministic FSA (which would be much harder to run by the code which
+    gets the FSA).
+
+    Note that, while `(A...)...` should not be allowed, `(xx A...)...` is
+    perfectly valid. The former results in a duplicated rule in the FSA, but
+    the latter does not.
+*** TODO Missing end parenthesis/bracket gets wrong error message
+    :PROPERTIES:
+    :CUSTOM_ID: missing-bracket-bad-error-message
+    :END:
+*** TODO Bad state numbering in groups with subgroups
+    :PROPERTIES:
+    :CUSTOM_ID: bad-state-numbers
+    :END:
+    When terminating a parenthesis or bracket each subgroup should end with the
+    same final state number, but the algorithm messes the state numbering up if
+    one (or more?) of the subgroups contain additional parentheses or brackets.
+
+    For example, when parsing `(A|(B)...)` a broke finite state automaton is
+    produced, which instead of the expected GOOD result, produces the BAD
+    result below:
+
+        ---------------------------------------------------------------
+          (   A   |   (   B   )   ...   )     <- input
+        0 ( 0 A 1 | 0 ( 0 B 1 ) 1 ... 1 ) 1   <- input + states (GOOD)
+                            |   |     |   |
+        0 ( 0 A 1 | 0 ( 0 B 2 ) 2 ... 2 ) 2   <- input + states (BAD)
+        ---------------------------------------------------------------
+
+    Upon entering the first group, the algorithm decides to use state `1` for
+    the end of the group (as evidenced by the subgroup `0 A 1`), but by the end
+    of the second alternative of that group it has instead decided to use `2`
+    -- presumably its being confused by the fact that that alternative contains
+    another group. This is WRONG as each alternative of a group (in this case
+    the first parenthesis/bracket group) MUST always end in the same state
+    number.
+** [0/3] Glue all the things together into usable whole
+*** TODO What else is missing
+    How should this code be executed? Simplest interface is prolly something
+    like:
+
+        ---------------------------------------------------------------
+        . ./docoptz.sh
+        docoptz()
+        ---------------------------------------------------------------
+
+    This also goes well with just copying the whole Docoptz source into the
+    beginning of a shell script that uses it (so that all source can be
+    included in just one file).
+*** TODO Write function which RULES -> eval:able code
+    There should be a function returning a valid FSA executer as a string that
+    can be eval:ed. E.g. something like this:
+        ---------------------------------------------------------------
+        STATE=0; SOFAR=''
+        for ARG in "$@"; do
+            echo ">>$STATE:$ARG"
+            case "$STATE:$ARG" in
+                "0:-h") STATE="1" ;;
+                "0:--help") STATE="1" ;;
+                "0:-t") STATE="1" ;;
+                "0:--test") STATE="1" ;;
+                "0:-v") STATE="1" ;;
+                "0:--version") STATE="1" ;;
+                *) warn "Unknown argument '$ARG'${SOFAR:+ after '$SOFAR'}"
+                   exit 42 ;;
+            esac
+            SOFAR="${SOFAR:+ $SOFAR}$ARG"
+        done
+
+        # Test if in a final state.
+        case "$STATE" in
+            1) :;;               # final states (`x|y|z` etc)
+            *) warn "Missing argument"; exit 42;;
+        esac
+        ---------------------------------------------------------------
+    This code also needs to:
+
+      + set the DOCOPTZ_<VARIABLE> option names.
+      + Handle bundled shortopts.
+*** TODO Cleanup Docoptz code / function namespace usage
+    All internal Docoptz functions should start with `docoptz_` (to avoid
+    namespace collisions) and the number of functions used should be minimized.
 ** [0/9] FUTURE MILESTONES
 *** TODO Options defined separately
     I.e. add an 'Options:' heading, and define options there.
